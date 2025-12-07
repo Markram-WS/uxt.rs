@@ -13,10 +13,10 @@ use super::spot;
 use crate::utils::{ get_env};
 
 pub enum Event {
-    Account(spot::Account),
-    Balance(spot::Balance),
-    Order(spot::Order),
-    Terminated(spot::Terminated)
+    Account(spot::public::Account),
+    Balance(spot::public::Balance),
+    Order(spot::public::Order),
+    Terminated(spot::public::Terminated)
 }
 
 #[allow(dead_code)]
@@ -105,7 +105,7 @@ async fn dispatch_event(txt: &str,event_tx: &mpsc::Sender<Event>) {
     match event_type {
         Some("outboundAccountPosition") => {
             if let Some(data) = parsed.get("data") {
-                match serde_json::from_value::<spot::Account>(data.clone()) {
+                match serde_json::from_value::<spot::public::Account>(data.clone()) {
                     Ok(ev) => {
                         
                             let _ = event_tx.send(Event::Account(ev)).await;  
@@ -120,7 +120,7 @@ async fn dispatch_event(txt: &str,event_tx: &mpsc::Sender<Event>) {
 
         Some("balanceUpdate") => {
             if let Some(data) = parsed.get("data") {
-                match serde_json::from_value::<spot::Balance>(data.clone()) {
+                match serde_json::from_value::<spot::public::Balance>(data.clone()) {
                     Ok(ev) => {
                        
                             let _ = event_tx.send(Event::Balance(ev)).await;  
@@ -134,7 +134,7 @@ async fn dispatch_event(txt: &str,event_tx: &mpsc::Sender<Event>) {
         }
         Some("executionReport") => {
             if let Some(data) = parsed.get("data") {
-                match serde_json::from_value::<spot::Order>(data.clone()) {
+                match serde_json::from_value::<spot::public::Order>(data.clone()) {
                     Ok(ev) => {
                      
                             let _ = event_tx.send(Event::Order(ev)).await; 
@@ -148,7 +148,7 @@ async fn dispatch_event(txt: &str,event_tx: &mpsc::Sender<Event>) {
         }
         Some("eventStreamTerminated") => {
             if let Some(data) = parsed.get("data") {
-                match serde_json::from_value::<spot::Terminated>(data.clone()) {
+                match serde_json::from_value::<spot::public::Terminated>(data.clone()) {
                     Ok(ev) => {
                        
                             let _ = event_tx.send(Event::Terminated(ev)).await;  

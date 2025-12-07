@@ -13,9 +13,9 @@ use super::spot;
 use crate::utils::{get_env};
 
 pub enum Event {
-    Trade(spot::Trade),
-    Kline(spot::Kline),
-    Ticker(spot::Ticker),
+    Trade(spot::public::Trade),
+    Kline(spot::public::Kline),
+    Ticker(spot::public::Ticker),
 }
 
 #[allow(dead_code)]
@@ -103,7 +103,7 @@ async fn dispatch_event(txt: &str,event_tx: &mpsc::Sender<Event>) {
     match event_type {
         Some("trade") => {
             if let Some(data) = parsed.get("data") {
-                match serde_json::from_value::<spot::Trade>(data.clone()) {
+                match serde_json::from_value::<spot::public::Trade>(data.clone()) {
                     Ok(ev) => {
                         
                             let _ = event_tx.send(Event::Trade(ev)).await;  
@@ -118,7 +118,7 @@ async fn dispatch_event(txt: &str,event_tx: &mpsc::Sender<Event>) {
 
         Some("kline") => {
             if let Some(data) = parsed.get("data") {
-                match serde_json::from_value::<spot::Kline>(data.clone()) {
+                match serde_json::from_value::<spot::public::Kline>(data.clone()) {
                     Ok(ev) => {
                        
                             let _ = event_tx.send(Event::Kline(ev)).await;  
@@ -132,7 +132,7 @@ async fn dispatch_event(txt: &str,event_tx: &mpsc::Sender<Event>) {
         }
         Some("24hrTicker") => {
             if let Some(data) = parsed.get("data") {
-                match serde_json::from_value::<spot::Ticker>(data.clone()) {
+                match serde_json::from_value::<spot::public::Ticker>(data.clone()) {
                     Ok(ev) => {
                        
                             let _ = event_tx.send(Event::Ticker(ev)).await;  
