@@ -7,9 +7,8 @@ mod tests {
     use std::env;
     use std::sync::Once;
     use dotenvy::dotenv;
-    use tradesys::api::binance::spot::order;
-    use tradesys::api::binance::spot::depth;
-    use tradesys::api::binance::spot::order::cancel;
+    use tradesys::binance::spot::rest::order;
+    use tradesys::binance::spot::rest::depth;
     use tradesys::utils::{get_env};
     
     static INIT: Once = Once::new();
@@ -59,8 +58,8 @@ mod tests {
         println!("count after open order : {:?}",&count_orders);
 
         for ord in opend_orders{
-            let param_cancel: cancel::Params<'_> = order::cancel::Params::new(&symbol,&ord.order_id);
-            let cancel_order:cancel::Order=  order::cancel_order(param_cancel).await.unwrap();
+            let param_cancel: order::cancel::Params<'_> = order::cancel::Params::new(&symbol,&ord.order_id);
+            let cancel_order:order::cancel::Order=  order::cancel_order(param_cancel).await.unwrap();
             println!("cancel order : {:?}",&cancel_order);
         }
         

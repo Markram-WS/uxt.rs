@@ -1,4 +1,4 @@
 pub mod utils;
 pub mod db;
-pub mod api;
-pub mod stream;
+//v2
+pub mod binance;
