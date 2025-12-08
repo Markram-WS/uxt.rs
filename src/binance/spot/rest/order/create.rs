@@ -206,12 +206,12 @@ pub struct Order {
 
 #[allow(dead_code)]
 pub async fn create_order<'a>(payload: Params<'a>)  -> Result< Order, Box<dyn Error>> {
-    let api_host = get_env("API_HOST");
-    let api_secret = get_env("API_SECRET");
-    let api_key = get_env("API_KEY");
+    let api_endpoint = get_env("BINANCE_REST_ENDPOINT");
+    let api_secret = get_env("BINANCE_SECRET");
+    let api_key = get_env("BINANCE_API");
     let query_string = serde_urlencoded::to_string(&payload.to_pairs())?;
     let signature: String = create_signature(&payload.to_pairs(),&api_secret)?;
-    let url = format!("{}/api/v3/order?{}&signature={}", api_host, query_string, signature);
+    let url = format!("{}/api/v3/order?{}&signature={}", api_endpoint, query_string, signature);
 
 
     let client = Client::new();

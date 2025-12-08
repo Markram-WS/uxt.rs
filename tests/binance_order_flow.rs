@@ -23,13 +23,13 @@ mod tests {
     #[tokio::test]
     async  fn test_api_binance_order_flow(){
         init();
-        let api_key = get_env("API_KEY_TEST");
-        let api_secret_test = get_env("API_SECRET_TEST");
+        let BINANCE_API = get_env("BINANCE_API_TEST");
+        let BINANCE_SECRET_test = get_env("BINANCE_SECRET_TEST");
     
         unsafe { 
-            env::set_var("API_HOST", "https://testnet.binance.vision");
-            env::set_var("API_SECRET", api_secret_test);
-            env::set_var("API_KEY", api_key);
+            env::set_var("BINANCE_REST_ENDPOINT", "https://testnet.binance.vision");
+            env::set_var("BINANCE_SECRET", BINANCE_SECRET_test);
+            env::set_var("BINANCE_API", BINANCE_API);
 
         };
         let symbol = "BTCUSDT";

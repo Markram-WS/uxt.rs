@@ -81,12 +81,12 @@ pub struct Balance {
 
 #[allow(dead_code)]
 pub async fn account_info(payload:Params) -> Result< AccountInfo, Box<dyn Error>> {
-    let api_host = get_env("API_HOST");
-    let api_secret = get_env("API_SECRET");
-    let api_key = get_env("API_KEY");
+    let api_endpoint = get_env("BINANCE_REST_ENDPOINT");
+    let api_secret = get_env("BINANCE_SECRET");
+    let api_key = get_env("BINANCE_API");
     let query_string = serde_urlencoded::to_string(&payload.to_pairs())?;
     let signature: String = create_signature(&payload.to_pairs(),&api_secret)?;
-    let url = format!("{}/api/v3/account?{}&signature={}", api_host,query_string, signature);
+    let url = format!("{}/api/v3/account?{}&signature={}", api_endpoint,query_string, signature);
 
     let client = Client::new();
 
@@ -127,12 +127,12 @@ mod tests {
     #[tokio::test]
     async  fn test_api_binance_spot_account_info(){
         init();
-        let api_key = get_env("API_KEY_TEST");
-        let api_secret_test = get_env("API_SECRET_TEST");
+        let BINANCE_API = get_env("BINANCE_API_TEST");
+        let BINANCE_SECRET_test = get_env("BINANCE_SECRET_TEST");
         unsafe { 
-            env::set_var("API_HOST", "https://testnet.binance.vision");
-            env::set_var("API_SECRET", api_secret_test);
-            env::set_var("API_KEY", api_key);
+            env::set_var("BINANCE_REST_ENDPOINT", "https://testnet.binance.vision");
+            env::set_var("BINANCE_SECRET", BINANCE_SECRET_test);
+            env::set_var("BINANCE_API", BINANCE_API);
 
         };
         let payload = Params::new();
