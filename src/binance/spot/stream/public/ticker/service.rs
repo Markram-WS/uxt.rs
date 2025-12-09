@@ -1,4 +1,3 @@
-use serde::de::value;
 use serde_json::Value;
 use super::model;
 use tokio::sync::{mpsc};
@@ -38,7 +37,7 @@ impl TickerService {
 
 
 #[tokio::test]
-async fn test_binance_spot_stream_ticker_service() {
+async fn test_binance_spot_pub_stream_ticker_service() {
     let (svc, mut rx) = TickerService::new();
 
     let sample = r#"{

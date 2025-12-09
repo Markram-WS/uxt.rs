@@ -1,4 +1,3 @@
-use serde::de::value;
 use serde_json::Value;
 use super::model;
 use tokio::sync::{mpsc};
@@ -20,7 +19,8 @@ impl TradeService {
         let parsed: Value = serde_json::from_str(txt)?;
     
         let event_type = parsed.get("e")
-            .or_else(|| parsed.get("data").and_then(|d| d.get("e")))
+            .or_else(|| parsed.get("data")
+            .and_then(|d| d.get("e")))
             .and_then(|v| v.as_str());
     
         if event_type == Some("trade") {
@@ -38,7 +38,7 @@ impl TradeService {
 
 
 #[tokio::test]
-async fn test_binance_spot_stream_trade_service() {
+async fn test_binance_spot_pub_stream_trade_service() {
     let (svc, mut rx) = TradeService::new();
 
     let sample = r#"{

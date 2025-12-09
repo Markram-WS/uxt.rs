@@ -24,8 +24,8 @@ mod tests {
         let params: Vec<(&str, String)> = vec![
             ("timestamp", "1760244698897".to_string()),
         ];
-        let BINANCE_SECRET = "MC4CAQAwBQYDK2VwBCIEIHvC/UOrqjH8NrhgY4gJFkgyfB359eC9Mofmj/qFvuzB";
-        assert_eq!(create_signature( &params,&BINANCE_SECRET).unwrap(), "qhA4ffi029s6iwNqaO9ex5qqjH7fZYVyBngZldEGm1rbXeexgwK2BK1%2F8NdviRmyq9kB1vXKCBVF4pk2C7SPBA%3D%3D");
+        let binance_secret = "MC4CAQAwBQYDK2VwBCIEIHvC/UOrqjH8NrhgY4gJFkgyfB359eC9Mofmj/qFvuzB";
+        assert_eq!(create_signature( &params,&binance_secret).unwrap(), "qhA4ffi029s6iwNqaO9ex5qqjH7fZYVyBngZldEGm1rbXeexgwK2BK1%2F8NdviRmyq9kB1vXKCBVF4pk2C7SPBA%3D%3D");
     }
 
 }

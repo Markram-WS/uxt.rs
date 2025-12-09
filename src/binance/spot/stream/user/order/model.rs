@@ -2,6 +2,12 @@
 use crate::utils::convert::{str_to_f64};
 use serde::{Deserialize, Serialize};
 
+pub struct OrderWrapper {
+    pub subscriptionId: u64,
+    pub event: Order,
+}
+
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Order {
     #[serde(rename = "e")]

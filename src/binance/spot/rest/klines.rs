@@ -137,7 +137,6 @@ impl From<RawKline> for Kline {
 #[allow(dead_code)]
 pub async fn get_klines<'a>(payload: Params<'a>) -> Result<Vec<Kline>, Box<dyn std::error::Error>> {
     let api_endpoint = get_env("BINANCE_REST_ENDPOINT");
-    let api_secret = get_env("BINANCE_SECRET");
     let api_key = get_env("BINANCE_API");
     let query_string = serde_urlencoded::to_string(&payload.to_pairs())?;
     let url = format!("{}/api/v3/klines?{}", api_endpoint, query_string);
@@ -184,12 +183,12 @@ mod tests {
     #[tokio::test]
     async  fn test_api_binance_spot_kline(){
         init();
-        let BINANCE_API = get_env("BINANCE_API_TEST");
-        let BINANCE_SECRET_test: String = get_env("BINANCE_SECRET_TEST");
+        let binance_api = get_env("BINANCE_API_TEST");
+        let binance_secret: String = get_env("BINANCE_SECRET_TEST");
         unsafe { 
             env::set_var("BINANCE_REST_ENDPOINT", "https://testnet.binance.vision");
-            env::set_var("BINANCE_SECRET", BINANCE_SECRET_test);
-            env::set_var("BINANCE_API", BINANCE_API);
+            env::set_var("BINANCE_SECRET", binance_secret);
+            env::set_var("BINANCE_API", binance_api);
 
         };
         let payload = Params::new("BTCUSDT",&Interval::Days1,&1759251600000i64,&1760029200000i64);

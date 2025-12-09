@@ -1,2 +1,2 @@
 pub mod public;
-pub mod manager;
+pub mod user;

@@ -1,4 +1,3 @@
-use serde::de::value;
 use serde_json::Value;
 use super::model;
 use tokio::sync::{mpsc};
@@ -39,7 +38,7 @@ impl KlineService {
 
 
 #[tokio::test]
-async fn test_binance_spot_stream_kline_service() {
+async fn test_binance_spot_pub_stream_kline_service() {
     let (svc, mut rx) = KlineService::new();
 
     let sample = r#"{
