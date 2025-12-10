@@ -12,14 +12,11 @@ use super::ws_builder::WsBuilder;
 type WsSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 
-
-
-
 pub struct WsClient {
-    ws: WsSocket,
-    api_key:String,
-    secret:String,
-    base_url:String
+    pub ws: WsSocket,
+    pub api_key:String,
+    pub secret:String,
+    pub base_url:String
     
 }
 

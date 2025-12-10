@@ -8,6 +8,7 @@ pub enum MarketType {
 pub enum StreamMode {
     Public,        // no sign
     UserData,      // signed/needs send_signed()
+    ApiSigned,          
 }
 
 pub struct WsBuilder {
@@ -37,6 +38,15 @@ impl WsBuilder {
 
     pub fn spot(api_key: &str, secret: &str) -> Self {
         Self::new(MarketType::Spot, api_key, secret)
+    }
+
+    // -------------------
+    // AUTHENTICATOR
+    // -------------------
+
+    pub fn api_signed(mut self) -> Self {
+        self.mode = StreamMode::ApiSigned;
+        self
     }
 
     // -------------------
@@ -83,12 +93,15 @@ impl WsBuilder {
             StreamMode::UserData => {
                 self.base_url = self.build_userdata_url();
             }
+            StreamMode::ApiSigned => {
+                self.base_url = self.build_apisigned_url();
+            }
         }
         self
     }
-
+  
     fn build_public_url(&self) -> String {
-        let base = get_env("BINANCE_WS_SPOT_PUBLIC");
+        let base = get_env("BINANCE_WS_SPOT_PUBLIC_ENDPOINT");
 
         if self.streams.is_empty() {
             panic!("Public stream requires at least one stream");
@@ -104,7 +117,16 @@ impl WsBuilder {
             .as_ref()
             .expect("UserData stream requires listenKey");
 
-        let base = get_env("BINANCE_WS_SPOT_USERDATA");
+        let base = get_env("BINANCE_WS_SPOT_API_ENDPOINT");
         format!("{}/ws/{}", base, key)
     }
+
+    fn build_apisigned_url(&self) -> String {
+        let key = self
+        .listen_key
+        .as_ref()
+        .expect("UserData stream requires listenKey");
+
+    let base = get_env("BINANCE_WS_SPOT_API_ENDPOINT");
+    format!("{}/ws-api/v3", base)    }
 }
