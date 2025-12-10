@@ -2,69 +2,62 @@
 
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::MaybeTlsStream;
-// connection.rs
-use tokio_tungstenite::{connect_async};
-use futures::{ StreamExt}; 
 use tokio::net::TcpStream;
-use tokio::sync::{mpsc,Mutex};
-use std::sync::Arc;
-type WsSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
-use std::error::Error;
-use sha2::{Digest, Sha256};
 use chrono::Utc;
+use futures_util::{SinkExt};
+use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Message;
+use super::signer::sign;
+use super::ws_builder::WsBuilder;
+type WsSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 
 
-pub struct WsTransport {
-    ws: Arc<Mutex<Option<WsSocket>>>,
-    url: String,
-    raw_tx: mpsc::Sender<String>,
+
+
+pub struct WsClient {
+    ws: WsSocket,
+    api_key:String,
+    secret:String,
+    base_url:String
+    
 }
 
-impl WsTransport {
-    pub fn new(url: String) -> (Self, mpsc::Receiver<String>) {
-        let ws = Arc::new(Mutex::new(None));
-        let (tx, rx) = mpsc::channel::<String>(100);
-
-        (Self { ws, url, raw_tx: tx }, rx)
+impl WsClient {
+    pub async fn connect(builder:WsBuilder) -> anyhow::Result<Self> {
+        
+        let (ws, _ ) = connect_async( builder.base_url.clone() ).await?;
+        Ok(Self {
+            ws,
+            api_key:builder.api_key,
+            secret:builder.secret,
+            base_url:builder.base_url
+        })
     }
 
-    pub async fn connect(&self) -> Result<(),Box<dyn Error>> {
-        let (ws_stream, _) = connect_async(&self.url).await?;
-        let mut ws = self.ws.lock().await;
-        *ws = Some(ws_stream);
+    pub async  fn send<T:serde::Serialize> (&mut self ,reqwest: &T) -> anyhow::Result<()> {
+        let json = serde_json::to_value(reqwest)?;
+        let text = serde_json::to_string(&json)?;
+        self.ws.send(Message::Text(text.into())).await?;
         Ok(())
-  
     }
 
-    pub async fn listen(&self) {
-        let ws = self.ws.clone();
-        let tx = self.raw_tx.clone();
 
-        tokio::spawn(async move {
-            let mut guard = ws.lock().await;
-            let socket = guard.as_mut().unwrap();
-
-            while let Some(msg) = socket.next().await {
-                if let Ok(m) = msg {
-                    if let Ok(text) = m.to_text() {
-                        let _ = tx.send(text.to_string()).await;
-                    }
-                }
-            }
-        });
+    pub async  fn send_signed<T:serde::Serialize> (&mut self ,reqwest: &T) -> anyhow::Result<()> {
+        let mut json = serde_json::to_value(reqwest)?;
+        let timestamp = Utc::now().timestamp_millis();
+        json["timestamp"] = timestamp.into();
+        let query = format!("timestamp={}", timestamp);
+        let signature = sign(&self.secret, &query);
+        json["signature"] = signature.into();
+        let text = serde_json::to_string(&json)?;
+        self.ws.send(Message::Text(text.into())).await?;
+        Ok(())
     }
-}
 
-
-fn gen_hash_id ( event : &str)  -> String {
-    let current_timestamp = Utc::now().timestamp_millis();
-    let timestamp_string = current_timestamp.to_string();
-    let data_to_hash = timestamp_string.as_bytes();
-    let mut hasher = Sha256::new();
-    hasher.update(data_to_hash);
-    hasher.update(event.as_bytes());
-    let result_bytes = hasher.finalize();
-    let hex_hash = hex::encode(result_bytes);
-    hex_hash
+    pub async fn send_json<T: serde::Serialize>(&mut self, data: &T) -> anyhow::Result<()> {
+        let txt = serde_json::to_string(data)?;
+        self.ws.send(Message::Text(txt.into())).await?;
+        Ok(())
+    }
 }

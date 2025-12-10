@@ -1,3 +1,4 @@
 pub mod ws;
 mod endpoint;
-mod ws_builder;
+pub mod signer;
+pub mod ws_builder;

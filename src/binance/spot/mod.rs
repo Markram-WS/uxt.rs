@@ -1,6 +1,6 @@
 
 mod transport;
-pub use transport::ws::{WsTransport};
+pub use transport::ws::{WsClient};
 
 pub mod rest;
 

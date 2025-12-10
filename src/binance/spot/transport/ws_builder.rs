@@ -1,101 +1,110 @@
-use crate::utils::env::get_env;
 
-#[derive(Debug, Clone)]
+use crate::utils::env::get_env;
 pub enum MarketType {
     Spot,
-    Futures,
+    Futures, // future support
 }
 
-#[derive(Debug, Clone)]
-pub enum Broker {
-    Binance,
-    // Bybit, Okx ... future
+pub enum StreamMode {
+    Public,        // no sign
+    UserData,      // signed/needs send_signed()
 }
 
 pub struct WsBuilder {
-    broker: Broker,
     market: MarketType,
+    mode: StreamMode,
     streams: Vec<String>,
+    listen_key: Option<String>,
+    pub api_key: String,
+    pub secret: String,
+
+    // final URL ที่จะใช้เชื่อมต่อ
+    pub base_url: String,
 }
 
 impl WsBuilder {
-    pub fn new(broker: Broker, market: MarketType) -> Self {
+    pub fn new(market: MarketType, api_key: &str, secret: &str) -> Self {
         Self {
-            broker,
             market,
+            mode: StreamMode::Public,
             streams: Vec::new(),
+            listen_key: None,
+            api_key: api_key.to_string(),
+            secret: secret.to_string(),
+            base_url: "".into(),
         }
     }
 
-    pub fn spot() -> Self {
-        Self::new(Broker::Binance, MarketType::Spot)
+    pub fn spot(api_key: &str, secret: &str) -> Self {
+        Self::new(MarketType::Spot, api_key, secret)
     }
 
-    pub fn futures() -> Self {
-        Self::new(Broker::Binance, MarketType::Futures)
-    }
-
-    // ------- PUBLIC STREAMS -------
+    // -------------------
+    // PUBLIC STREAMS
+    // -------------------
 
     pub fn kline(mut self, symbol: &str, interval: &str) -> Self {
+        self.mode = StreamMode::Public;
         self.streams.push(format!("{}@kline_{}", symbol.to_lowercase(), interval));
         self
     }
 
     pub fn trade(mut self, symbol: &str) -> Self {
+        self.mode = StreamMode::Public;
         self.streams.push(format!("{}@trade", symbol.to_lowercase()));
         self
     }
 
-    pub fn book_ticker(mut self, symbol: &str) -> Self {
+    pub fn ticker(mut self, symbol: &str) -> Self {
+        self.mode = StreamMode::Public;
         self.streams.push(format!("{}@bookTicker", symbol.to_lowercase()));
         self
     }
 
-    pub fn depth(mut self, symbol: &str, level: u16) -> Self {
-        self.streams.push(format!("{}@depth{}", symbol.to_lowercase(), level));
+    // -------------------
+    // USER DATA STREAM
+    // -------------------
+
+    pub fn user_data(mut self, listen_key: &str) -> Self {
+        self.mode = StreamMode::UserData;
+        self.listen_key = Some(listen_key.to_string());
         self
     }
 
-    // ------- USER DATA -------
+    // -------------------
+    // BUILD URL
+    // -------------------
 
-    pub fn listen_key(self, listen_key: &str) -> String {
-        match (self.broker, self.market) {
-            (Broker::Binance, MarketType::Spot) => {
-                let base = get_env("BINANCE_WS_SPOT_USERDATA");
-                format!("{}/ws/{}", base, listen_key)
+    pub fn build(mut self) -> Self {
+        match self.mode {
+            StreamMode::Public => {
+                self.base_url = self.build_public_url();
             }
-
-            (Broker::Binance, MarketType::Futures) => {
-                let base = get_env("BINANCE_WS_FUTURES_USERDATA");
-                format!("{}/ws/{}", base, listen_key)
+            StreamMode::UserData => {
+                self.base_url = self.build_userdata_url();
             }
-
-            //_ => todo!("support other brokers")
         }
+        self
     }
 
-    // ------- BUILD URL -------
+    fn build_public_url(&self) -> String {
+        let base = get_env("BINANCE_WS_SPOT_PUBLIC");
 
-    pub fn build(self) -> String {
         if self.streams.is_empty() {
-            panic!("No streams added to WsBuilder");
+            panic!("Public stream requires at least one stream");
         }
 
-        let stream_query = self.streams.join("/");
+        let q = self.streams.join("/");
+        format!("{}/stream?streams={}", base, q)
+    }
 
-        match (self.broker, self.market) {
-            (Broker::Binance, MarketType::Spot) => {
-                let base = get_env("BINANCE_WS_SPOT_PUBLIC");
-                format!("{}/stream?streams={}", base, stream_query)
-            }
+    fn build_userdata_url(&self) -> String {
+        let key = self
+            .listen_key
+            .as_ref()
+            .expect("UserData stream requires listenKey");
 
-            (Broker::Binance, MarketType::Futures) => {
-                let base = get_env("BINANCE_WS_FUTURES_PUBLIC");
-                format!("{}/stream?streams={}", base, stream_query)
-            }
-
-            //_ => todo!("support other brokers")
-        }
+        let base = get_env("BINANCE_WS_SPOT_USERDATA");
+        format!("{}/ws/{}", base, key)
     }
 }
