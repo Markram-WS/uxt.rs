@@ -7,9 +7,9 @@ mod tests {
     use std::env;
     use std::sync::Once;
     use dotenvy::dotenv;
-    use tradesys::binance::spot::rest::order;
-    use tradesys::binance::spot::rest::depth;
-    use tradesys::utils::{get_env};
+    use utx::binance::spot::rest::order;
+    use utx::binance::spot::rest::depth;
+    use utx::utils::{get_env};
     
     static INIT: Once = Once::new();
 
