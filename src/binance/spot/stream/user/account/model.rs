@@ -1,8 +1,10 @@
 use crate::utils::convert::{str_to_f64};
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize)]
 pub struct AccountWrapper {
-    pub subscriptionId: u64,
+    #[serde(rename = "subscriptionId")]
+    pub subscription_id: u64,
     pub event: Account,
 }
 
