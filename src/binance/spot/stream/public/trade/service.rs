@@ -4,6 +4,7 @@ use tokio::sync::{mpsc};
 use std::error::Error;
 type Event = model::Trade;
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct TradeService {
     tx: mpsc::Sender<Event>,
 }
@@ -15,7 +16,7 @@ impl TradeService {
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self,txt: &str) ->Result< (), Box<dyn Error>> {
+    pub async fn handle(&self,txt:&str) ->Result< (), Box<dyn Error>> {
         let parsed: Value = serde_json::from_str(txt)?;
     
         let event_type = parsed.get("e")

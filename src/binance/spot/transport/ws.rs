@@ -10,7 +10,7 @@ use tokio_tungstenite::tungstenite::Message;
 use super::signer::sign;
 use super::ws_builder::WsBuilder;
 type WsSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
-
+use futures_util::StreamExt; 
 
 pub struct WsClient {
     pub ws: WsSocket,
@@ -22,7 +22,7 @@ pub struct WsClient {
 
 impl WsClient {
     pub async fn connect(builder:WsBuilder) -> anyhow::Result<Self> {
-        
+        println!("WsClient::connect -> {}",&builder.base_url);
         let (ws, _ ) = connect_async( builder.base_url.clone() ).await?;
         Ok(Self {
             ws,
@@ -57,4 +57,19 @@ impl WsClient {
         self.ws.send(Message::Text(txt.into())).await?;
         Ok(())
     }
+
+    pub async fn read_loop<F, Fut>(&mut self, mut handler: F) -> anyhow::Result<()>
+    where
+        F: FnMut(String) -> Fut,
+        Fut: std::future::Future<Output = anyhow::Result<()>>,
+    {
+        while let Some(msg) = self.ws.next().await {
+            let msg = msg?;
+            if let Message::Text(txt) = msg {
+                handler(txt.to_string()).await?;
+            }
+        }
+        Ok(())
+    }
 }
+

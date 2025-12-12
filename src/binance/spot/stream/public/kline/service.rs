@@ -5,6 +5,7 @@ type Event = model::Kline;
 use std::error::Error;
 
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct KlineService {
     tx: mpsc::Sender<Event>,
 }
@@ -16,7 +17,7 @@ impl KlineService {
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self,txt: &str) ->Result< (), Box<dyn Error>> {
+    pub async fn handle(&self,txt:&str) ->Result< (), Box<dyn Error>> {
         let parsed: Value = serde_json::from_str(txt)?;
     
         let event_type = parsed.get("e")

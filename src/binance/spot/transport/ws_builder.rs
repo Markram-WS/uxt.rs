@@ -1,5 +1,7 @@
 
 use crate::utils::env::get_env;
+use crate::binance::spot::public::Interval; 
+
 pub enum MarketType {
     Spot,
     Futures, // future support
@@ -53,9 +55,9 @@ impl WsBuilder {
     // PUBLIC STREAMS
     // -------------------
 
-    pub fn kline(mut self, symbol: &str, interval: &str) -> Self {
+    pub fn kline(mut self, symbol: &str, interval: Interval) -> Self {
         self.mode = StreamMode::Public;
-        self.streams.push(format!("{}@kline_{}", symbol.to_lowercase(), interval));
+        self.streams.push(format!("{}@kline_{}", symbol.to_lowercase(), &interval.as_str() ));
         self
     }
 

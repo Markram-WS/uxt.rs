@@ -7,4 +7,5 @@ pub mod ws;
 
 mod stream;
 pub use stream::public;
+pub use stream::public::{Interval};
 pub use stream::user;
