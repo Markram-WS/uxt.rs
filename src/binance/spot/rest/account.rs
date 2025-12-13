@@ -81,7 +81,7 @@ pub struct Balance {
 
 #[allow(dead_code)]
 pub async fn account_info(payload:Params) -> Result< AccountInfo, Box<dyn Error>> {
-    let api_endpoint = get_env("BINANCE_REST_ENDPOINT");
+    let api_endpoint = get_env("BINANCE_REST_SPOT_API_ENDPOINT");
     let api_secret = get_env("BINANCE_SECRET");
     let api_key = get_env("BINANCE_API");
     let query_string = serde_urlencoded::to_string(&payload.to_pairs())?;
@@ -130,7 +130,7 @@ mod tests {
         let binance_api = get_env("BINANCE_API_TEST");
         let binance_secret = get_env("BINANCE_SECRET_TEST");
         unsafe { 
-            env::set_var("BINANCE_REST_ENDPOINT", "https://testnet.binance.vision");
+            env::set_var("BINANCE_REST_SPOT_API_ENDPOINT", "https://testnet.binance.vision");
             env::set_var("BINANCE_SECRET", binance_secret);
             env::set_var("BINANCE_API", binance_api);
 

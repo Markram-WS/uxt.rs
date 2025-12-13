@@ -46,7 +46,7 @@ pub struct Trade {
 
 #[allow(dead_code)]
 pub async fn get_trades<'a>(payload: Params<'a>) -> Result<Vec<Trade>, Box<dyn std::error::Error>> {
-    let api_endpoint = get_env("BINANCE_REST_ENDPOINT");
+    let api_endpoint = get_env("BINANCE_REST_SPOT_API_ENDPOINT");
     let api_key = get_env("BINANCE_API");
     let query_string = serde_urlencoded::to_string(&payload.to_pairs())?;
     let url = format!("{}/api/v3/trades?{}", api_endpoint, query_string);
@@ -93,7 +93,7 @@ mod tests {
         let binance_api = get_env("BINANCE_API_TEST");
         let binance_secret: String = get_env("BINANCE_SECRET_TEST");
         unsafe { 
-            env::set_var("BINANCE_REST_ENDPOINT", "https://testnet.binance.vision");
+            env::set_var("BINANCE_REST_SPOT_API_ENDPOINT", "https://testnet.binance.vision");
             env::set_var("BINANCE_SECRET", binance_secret);
             env::set_var("BINANCE_API", binance_api);
 

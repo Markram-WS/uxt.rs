@@ -24,13 +24,18 @@ mod tests {
     async  fn test_binance_spot_pub_stream(){
         init();
         let binance_api = get_env("BINANCE_API_TEST");
-        let binance_secret = get_env("BINANCE_SECRET_TEST");
-        let binance_api_endpoint = get_env("BINANCE_WS_SPOT_API_ENDPOINT_TEST");
+        let binance_secret: String = get_env("BINANCE_SECRET_TEST");
+        let binance_rest_api_endpoint = get_env("BINANCE_REST_SPOT_API_ENDPOINT_TEST");
+        let binance_ws_api_endpoint = get_env("BINANCE_WS_SPOT_WS_API_ENDPOINT_TEST");
+        let binance_ws_spot_userdata_endpoint = get_env("BINANCE_WS_SPOT_USERDATA_ENDPOINT_TEST");
         let binance_ws_public_endpoint_test = get_env("BINANCE_WS_SPOT_PUBLIC_ENDPOINT_TEST");
+
         unsafe { 
             env::set_var("BINANCE_API", &binance_api);
             env::set_var("BINANCE_SECRET", &binance_secret);
-            env::set_var("BINANCE_WS_SPOT_API_ENDPOINT", &binance_api_endpoint);
+            env::set_var("BINANCE_REST_SPOT_API_ENDPOINT", &binance_rest_api_endpoint);
+            env::set_var("BINANCE_WS_SPOT_API_ENDPOINT", &binance_ws_api_endpoint);
+            env::set_var("BINANCE_WS_SPOT_USERDATA_ENDPOINT", &binance_ws_spot_userdata_endpoint);
             env::set_var("BINANCE_WS_SPOT_PUBLIC_ENDPOINT", &binance_ws_public_endpoint_test);
         };
         let symbol =  "btcusdt";

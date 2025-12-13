@@ -27,7 +27,7 @@ mod tests {
         let binance_secret = get_env("BINANCE_SECRET_TEST");
     
         unsafe { 
-            env::set_var("BINANCE_REST_ENDPOINT", "https://testnet.binance.vision");
+            env::set_var("BINANCE_REST_SPOT_API_ENDPOINT", "https://testnet.binance.vision");
             env::set_var("BINANCE_SECRET", binance_secret);
             env::set_var("BINANCE_API", binance_api);
 

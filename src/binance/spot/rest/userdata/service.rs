@@ -8,7 +8,6 @@ use tokio::time::Duration;
 pub struct UserDataRestService;
 
 impl UserDataRestService {
-    /// POST /api/v3/userDataStream
     pub async fn create_listen_key(
         client: &RestClient,
     ) -> anyhow::Result<String> {

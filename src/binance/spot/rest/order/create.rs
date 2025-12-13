@@ -206,7 +206,7 @@ pub struct Order {
 
 #[allow(dead_code)]
 pub async fn create_order<'a>(payload: Params<'a>)  -> Result< Order, Box<dyn Error>> {
-    let api_endpoint = get_env("BINANCE_REST_ENDPOINT");
+    let api_endpoint = get_env("BINANCE_REST_SPOT_API_ENDPOINT");
     let api_secret = get_env("BINANCE_SECRET");
     let api_key = get_env("BINANCE_API");
     let query_string = serde_urlencoded::to_string(&payload.to_pairs())?;

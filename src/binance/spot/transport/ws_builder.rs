@@ -119,7 +119,7 @@ impl WsBuilder {
             .as_ref()
             .expect("UserData stream requires listenKey");
 
-        let base = get_env("BINANCE_WS_SPOT_API_ENDPOINT");
+        let base = get_env("BINANCE_WS_SPOT_USERDATA_ENDPOINT_TEST");
         format!("{}/ws/{}", base, key)
     }
 
