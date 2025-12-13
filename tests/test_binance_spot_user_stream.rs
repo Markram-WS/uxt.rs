@@ -21,7 +21,7 @@ mod tests {
     }
     
     #[tokio::test]
-    async  fn test_binance_spot_pub_stream(){
+    async  fn test_binance_spot_user_stream(){
         init();
         let binance_api = get_env("BINANCE_API_TEST");
         let binance_secret = get_env("BINANCE_SECRET_TEST");
@@ -87,6 +87,7 @@ mod tests {
                         got_t = true;
           
                     }
+                    //order book message recive when book has change
                     Some(x) = rx_ticker.recv() => {
                         if got_t == false {
                             println!("[TICKER] {:?}", &x);
