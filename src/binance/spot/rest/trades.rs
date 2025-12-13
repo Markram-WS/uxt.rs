@@ -34,7 +34,7 @@ pub struct Trade {
     pub price: f64,
     #[serde(rename = "qty", deserialize_with = "str_to_f64")]
     pub qty: f64,
-    #[serde(rename = "quoteQty")]
+    #[serde(rename = "quoteQty", deserialize_with = "str_to_f64")]
     pub quote_qty: f64,
     #[serde(rename = "time")]
     pub time: i64,

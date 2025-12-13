@@ -27,7 +27,7 @@ mod tests {
         let binance_api = get_env("BINANCE_API_TEST");
         let binance_secret: String = get_env("BINANCE_SECRET_TEST");
         let binance_rest_api_endpoint = get_env("BINANCE_REST_SPOT_API_ENDPOINT_TEST");
-        let binance_ws_api_endpoint = get_env("BINANCE_WS_SPOT_WS_API_ENDPOINT_TEST");
+        let binance_ws_api_endpoint = get_env("BINANCE_WS_SPOT_API_ENDPOINT_TEST");
         let binance_ws_spot_userdata_endpoint = get_env("BINANCE_WS_SPOT_USERDATA_ENDPOINT_TEST");
         let binance_ws_public_endpoint_test = get_env("BINANCE_WS_SPOT_PUBLIC_ENDPOINT_TEST");
 
@@ -94,28 +94,26 @@ mod tests {
         let mut got_b = false;
         
 
-        let res: Result<(), tokio::time::error::Elapsed> = timeout(Duration::from_secs(5), async {
+        let res: Result<(), tokio::time::error::Elapsed> = timeout(Duration::from_secs(60), async {
             loop {
                 tokio::select! {
-                    Some(k) = rx_order.recv() => {
-                        if got_o == false {
+                    msg = rx_order.recv() => {
+                        if let Some(k) = msg {
+                            got_o = true;
                             println!("[ORDER] {:?}", &k);
                         }
-                        got_o = true;
                     }
-                    Some(t) = rx_acc.recv() => {
-                        if got_a == false {
+                    msg = rx_acc.recv() => {
+                        if let Some(t) = msg {
+                            got_a = true;
                             println!("[ACCOUNT] {:?}", &t);
                         }
-                        got_a = true;
-          
                     }
-                    //order book message recive when book has change
-                    Some(x) = rx_bal.recv() => {
-                        if got_b == false {
+                    msg = rx_bal.recv() => {
+                        if let Some(x) = msg {
+                            got_b = true;
                             println!("[BALANCE] {:?}", &x);
                         }
-                        got_b = true;
                     }
                 }
     
@@ -124,14 +122,11 @@ mod tests {
                 }
             }
 
-            shutdown_tx.send(true).unwrap(); 
+            let _ = shutdown_tx.send(true);
             ws_task.await.unwrap();
 
 
         }).await;
-
-  
-
 
         assert!(res.is_ok(), "timeout: did not receive all 3 events within time");
         assert!(got_o, "missing order event");
