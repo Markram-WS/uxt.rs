@@ -4,6 +4,7 @@ use tokio::sync::{mpsc};
 use std::error::Error;
 type Event = model::Balance;
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct BalanceService {
     tx: mpsc::Sender<Event>,
 }

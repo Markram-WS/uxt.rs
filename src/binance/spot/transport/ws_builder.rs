@@ -114,7 +114,7 @@ impl WsBuilder {
     }
 
     fn build_userdata_url(&self) -> String {
-        let key = self
+        let key: &String = self
             .listen_key
             .as_ref()
             .expect("UserData stream requires listenKey");
@@ -124,7 +124,7 @@ impl WsBuilder {
     }
 
     fn build_apisigned_url(&self) -> String {
-        let key = self
+        let key: &String = self
         .listen_key
         .as_ref()
         .expect("UserData stream requires listenKey");

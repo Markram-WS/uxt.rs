@@ -4,6 +4,7 @@ use tokio::sync::{mpsc};
 use std::error::Error;
 type Event = model::Account;
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct AccountService {
     tx: mpsc::Sender<Event>,
 }

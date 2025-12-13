@@ -4,6 +4,7 @@ use tokio::sync::{mpsc};
 use std::error::Error;
 type Event = model::Order;
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct OrderService {
     tx: mpsc::Sender<Event>,
 }

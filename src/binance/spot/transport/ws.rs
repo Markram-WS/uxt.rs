@@ -11,6 +11,8 @@ use super::signer::sign;
 use super::ws_builder::WsBuilder;
 type WsSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 use futures_util::StreamExt; 
+use tokio_tungstenite::tungstenite::protocol::CloseFrame;
+use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
 
 pub struct WsClient {
     pub ws: WsSocket,
@@ -71,5 +73,25 @@ impl WsClient {
         }
         Ok(())
     }
+
+    pub async fn read_once(&mut self) -> anyhow::Result<Option<String>> {
+        match self.ws.next().await {
+            Some(Ok(Message::Text(txt))) => Ok(Some(txt.to_string())),
+            Some(Ok(_)) => Ok(None),          // ignore non-text
+            Some(Err(e)) => Err(e.into()),
+            None => Ok(None),                 // ws closed
+        }
+    }
+
+    pub async fn close(&mut self) -> anyhow::Result<()> {
+        self.ws
+            .close(Some(CloseFrame {
+                code: CloseCode::Normal,
+                reason: "client shutdown".into(),
+            }))
+            .await?;
+        Ok(())
+    }
+
 }
 

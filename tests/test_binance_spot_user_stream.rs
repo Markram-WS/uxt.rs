@@ -7,9 +7,10 @@ mod tests {
     use std::env;
     use std::sync::Once;
     use dotenvy::dotenv;
-    use utx::binance::spot::{WsBuilder,WsClient,Interval};
-    use utx::binance::spot::public::{KlineService,TradeService,TickerService};
+    use utx::binance::spot::{WsBuilder,WsClient,RestClient};
     use utx::utils::{get_env};
+    use utx::binance::spot::rest::UserDataRestService;
+    use utx::binance::spot::userdata::{UserDataAuthService,OrderService,AccountService,BalanceService};
     use tokio::time::{timeout, Duration};
     static INIT: Once = Once::new();
 
@@ -34,77 +35,105 @@ mod tests {
             env::set_var("BINANCE_WS_SPOT_PUBLIC_ENDPOINT", &binance_ws_public_endpoint_test);
         };
         let symbol =  "btcusdt";
-        
+   
+        let rest = RestClient::new(
+            &binance_api_endpoint,
+            &binance_api,
+            &binance_secret,
+        );
 
-        let pub_builder = WsBuilder::spot(&binance_api,&binance_secret)
-            .kline(&symbol,Interval::Days1)
-            .trade(&symbol)
-            .ticker(&symbol)
+
+        
+        let listen_key = UserDataRestService::create_listen_key(&rest).await.unwrap();
+
+        let userdata_builder = WsBuilder::spot(&binance_api,&binance_secret)
+            .user_data(&listen_key)
             .build();
 
-        let mut ws_pub_client = WsClient::connect(pub_builder).await.unwrap();
+        let mut ws_userdata_client = WsClient::connect(userdata_builder).await.unwrap();
 
+        UserDataAuthService::subscribe(&mut ws_userdata_client).await.unwrap();
+    
 
-        let (klineservice, mut rx_kline) = KlineService::new();
-        let (tradeservice, mut rx_trade) = TradeService::new();
-        let (tickerservice, mut rx_ticker) = TickerService::new();
+        let (orderservice, mut rx_order) = OrderService ::new();
+        let (accountservice, mut rx_acc) = AccountService::new();
+        let (balanceservice, mut rx_bal) = BalanceService::new();
 
-        tokio::spawn(async move {
-            ws_pub_client.read_loop(move |txt| {
-                let klineservice = klineservice.clone();   
-                let tradeservice = tradeservice.clone();    
-                let tickerservice = tickerservice.clone();     
-                let txt = txt.clone();
-        
-                async move {
-                    klineservice.handle(&txt).await.expect("`Err` klineservice message handling");
-                    tradeservice.handle(&txt).await.expect("`Err` tradeservice message handling");
-                    tickerservice.handle(&txt).await.expect("`Err` tickerservice message handling");
-                    Ok(())
-                }
-            })
-            .await
-            .unwrap();
-        });
-        let mut got_k = false;
-        let mut got_t = false;
-        let mut got_x = false;
-        
+        let (shutdown_tx, mut shutdown_rx) = tokio::sync::watch::channel(false);
 
-        let res = timeout(Duration::from_secs(1000), async {
+        let ws_task = tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    Some(k) = rx_kline.recv() => {
-                        if got_k == false {
-                            println!("[KLINE] {:?}", &k);
-                        }
-                        got_k = true;
+                    _ = shutdown_rx.changed() => {
+                        ws_userdata_client.close().await.ok();
+                        break;
                     }
-                    Some(t) = rx_trade.recv() => {
-                        if got_t == false {
-                            println!("[TRADE] {:?}", &t);
+        
+                    msg = ws_userdata_client.read_once() => {
+                        let Some(txt) = msg.expect("ws read error") else {
+                            break; // ws closed
+                        };
+        
+                        orderservice.handle(&txt).await
+                            .expect("orderservice error");
+                        accountservice.handle(&txt).await
+                            .expect("accountservice error");
+                        balanceservice.handle(&txt).await
+                            .expect("balanceservice error");
+                    }
+                }
+            }
+        });
+
+        let mut got_o = false;
+        let mut got_a = false;
+        let mut got_b = false;
+        
+
+        let res: Result<(), tokio::time::error::Elapsed> = timeout(Duration::from_secs(5), async {
+            loop {
+                tokio::select! {
+                    Some(k) = rx_order.recv() => {
+                        if got_o == false {
+                            println!("[ORDER] {:?}", &k);
                         }
-                        got_t = true;
+                        got_o = true;
+                    }
+                    Some(t) = rx_acc.recv() => {
+                        if got_a == false {
+                            println!("[ACCOUNT] {:?}", &t);
+                        }
+                        got_a = true;
           
                     }
                     //order book message recive when book has change
-                    Some(x) = rx_ticker.recv() => {
-                        if got_t == false {
-                            println!("[TICKER] {:?}", &x);
+                    Some(x) = rx_bal.recv() => {
+                        if got_b == false {
+                            println!("[BALANCE] {:?}", &x);
                         }
-                        got_x = true;
+                        got_b = true;
                     }
                 }
     
-                if got_k && got_t  {
+                if got_o && got_a && got_b {
                     break;
                 }
             }
+
+            shutdown_tx.send(true).unwrap(); 
+            ws_task.await.unwrap();
+
+
         }).await;
+
+  
+
+
         assert!(res.is_ok(), "timeout: did not receive all 3 events within time");
-        assert!(got_k, "missing kline event");
-        assert!(got_t, "missing trade event");
-        //assert!(got_x, "missing ticker event");
+        assert!(got_o, "missing order event");
+        assert!(got_a, "missing account event");
+        assert!(got_b, "missing balance event");
+
 
     }
 }

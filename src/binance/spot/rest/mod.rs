@@ -7,7 +7,8 @@ pub mod klines;
 pub use klines::{get_klines};
 pub mod trades;
 pub use trades::{get_trades};
-
+mod userdata;
+pub use userdata::service::{UserDataRestService};
 
 pub mod order;
 pub use order::create::create_order;

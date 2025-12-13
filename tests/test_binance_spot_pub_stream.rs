@@ -71,7 +71,7 @@ mod tests {
         let mut got_x = false;
         
 
-        let res = timeout(Duration::from_secs(1000), async {
+        let res = timeout(Duration::from_secs(3), async {
             loop {
                 tokio::select! {
                     Some(k) = rx_kline.recv() => {
