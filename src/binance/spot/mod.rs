@@ -1,7 +1,7 @@
 
 mod transport;
-pub use transport::ws::{WsClient};
-pub use transport::ws_builder::{WsBuilder};
+pub use transport::ws_client::{*};
+pub use transport::ws_builder::{WsBuilder,StreamMode};
 pub use transport::rest::{RestClient};
 
 mod stream;

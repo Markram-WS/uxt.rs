@@ -1,9 +1,9 @@
 use uuid::Uuid;
 use chrono::Utc;
 
-use crate::binance::spot::transport::signer::sign;
+use crate::utils::sign;
 use super::model::{UserDataSubscribeRequest, UserDataSubscribeParams};
-use crate::binance::spot::transport::ws::WsClient;
+use crate::binance::spot::WsClient;
 
 pub struct UserDataAuthService;
 
@@ -14,19 +14,19 @@ impl UserDataAuthService {
 
         // query = "timestamp=<ts>"
         let query = format!("timestamp={}", ts);
-        let signature = sign(&client.secret, &query);
+        let signature = sign(&client.role.secret()?, &query);
 
         let req = UserDataSubscribeRequest {
             id: Uuid::new_v4().to_string(),
             method: "userDataStream.subscribe.signature".into(),
             params: UserDataSubscribeParams {
-                apiKey: client.api_key.clone(),
+                apiKey: client.role.api_key()?.to_string(),
                 timestamp: ts,
                 signature,
             },
         };
 
-        client.send_json(&req).await?;
+        client.send(&req).await?;
         Ok(())
     }
 }

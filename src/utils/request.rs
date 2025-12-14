@@ -4,6 +4,16 @@ use ed25519_dalek::Signer;
 use pkcs8::DecodePrivateKey; // <— ต้องเพิ่มบรรทัดนี้
 use urlencoding::encode;
 
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+
+pub fn sign(secret: &str, payload: &str) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())
+        .expect("HMAC can take key of any size");
+    mac.update(payload.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
 pub fn create_signature( payload: &Vec<(&str, String)>,private_key:&str) ->  Result<String, Box<dyn std::error::Error>> {
     let query_string  = serde_urlencoded::to_string(&payload).expect("url params encode failed");
     let key_bytes = general_purpose::STANDARD.decode(private_key)?;

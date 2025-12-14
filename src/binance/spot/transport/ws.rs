@@ -7,7 +7,7 @@ use chrono::Utc;
 use futures_util::{SinkExt};
 use tokio_tungstenite::connect_async;
 use tokio_tungstenite::tungstenite::Message;
-use super::signer::sign;
+use crate::utils::sign;
 use super::ws_builder::WsBuilder;
 type WsSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 use futures_util::StreamExt; 
@@ -43,7 +43,7 @@ impl WsClient {
 
 
     pub async  fn send_signed<T:serde::Serialize> (&mut self ,reqwest: &T) -> anyhow::Result<()> {
-        let mut json = serde_json::to_value(reqwest)?;
+        let mut json: serde_json::Value = serde_json::to_value(reqwest)?;
         let timestamp = Utc::now().timestamp_millis();
         json["timestamp"] = timestamp.into();
         let query = format!("timestamp={}", timestamp);

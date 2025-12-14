@@ -9,6 +9,7 @@ mod tests {
     use dotenvy::dotenv;
     use utx::binance::spot::{WsBuilder,WsClient,Interval};
     use utx::binance::spot::public::{KlineService,TradeService,TickerService};
+
     use utx::utils::{get_env};
     use tokio::time::{timeout, Duration};
     static INIT: Once = Once::new();
@@ -41,36 +42,36 @@ mod tests {
         let symbol =  "btcusdt";
         
 
-        let pub_builder = WsBuilder::spot(&binance_api,&binance_secret)
+        let builder = WsBuilder::spot(&binance_api,&binance_secret)
             .kline(&symbol,Interval::Days1)
             .trade(&symbol)
             .ticker(&symbol)
             .build();
 
-        let mut ws_pub_client = WsClient::connect(pub_builder).await.unwrap();
+        let mut ws_client = WsClient::connect(builder).await.unwrap();
 
 
         let (klineservice, mut rx_kline) = KlineService::new();
         let (tradeservice, mut rx_trade) = TradeService::new();
         let (tickerservice, mut rx_ticker) = TickerService::new();
 
-        tokio::spawn(async move {
-            ws_pub_client.read_loop(move |txt| {
-                let klineservice = klineservice.clone();   
-                let tradeservice = tradeservice.clone();    
-                let tickerservice = tickerservice.clone();     
-                let txt = txt.clone();
+
+        let ws_task = tokio::spawn(async move {
+            loop {
+                tokio::select! {        
+                    msg = ws_client.read_once() => {
+                        let Some(txt) = msg.expect("ws read error") else {
+                            break; // ws closed
+                        };
         
-                async move {
-                    klineservice.handle(&txt).await.expect("`Err` klineservice message handling");
-                    tradeservice.handle(&txt).await.expect("`Err` tradeservice message handling");
-                    tickerservice.handle(&txt).await.expect("`Err` tickerservice message handling");
-                    Ok(())
+                        klineservice.handle(&txt).await.expect("`Err` klineservice message handling");
+                        tradeservice.handle(&txt).await.expect("`Err` tradeservice message handling");
+                        tickerservice.handle(&txt).await.expect("`Err` tickerservice message handling");
+                    }
                 }
-            })
-            .await
-            .unwrap();
+            }
         });
+
         let mut got_k = false;
         let mut got_t = false;
         let mut got_x = false;
