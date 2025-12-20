@@ -40,7 +40,10 @@ mod tests {
             env::set_var("BINANCE_WS_SPOT_PUBLIC_ENDPOINT", &binance_ws_public_endpoint_test);
         };
 
-        //pass
+
+        // let builder = WsBuilder::spot(&binance_api,&binance_secret).ws().build();
+        // ws_client = WsClient.connect(builder);
+        // ws_client.send_wsapi()
 
 
     }

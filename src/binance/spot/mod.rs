@@ -8,5 +8,8 @@ mod stream;
 pub use stream::public;
 pub use stream::public::{Interval};
 pub use stream::userdata;
+
+mod ws;
+
 pub mod rest;
 

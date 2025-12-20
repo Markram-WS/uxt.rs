@@ -80,6 +80,15 @@ impl WsBuilder {
     }
 
     // -------------------
+    // USER Websocket
+    // -------------------
+
+    pub fn ws(mut self) -> Self {
+        self.mode = StreamMode::WsApi;
+        self
+    }
+
+    // -------------------
     // BUILD URL
     // -------------------
 
