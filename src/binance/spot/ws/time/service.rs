@@ -2,64 +2,58 @@ use serde_json::Value;
 use super::model;
 use tokio::sync::{mpsc};
 use std::error::Error;
-type Event = model::Account;
+
+type Event = model::Time;
+type Response = model::Response;
 #[allow(dead_code)]
 #[derive(Clone)]
-pub struct AccountService {
+pub struct TimeService {
     tx: mpsc::Sender<Event>,
 }
 
 #[allow(dead_code)]
-impl AccountService {
+impl TimeService {
     pub fn new() -> (Self, mpsc::Receiver<Event>) {
         let (tx, rx) = mpsc::channel(100);
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self,txt: &str) ->Result< (), Box<dyn Error>> {
-        let parsed: Value = serde_json::from_str(txt)?;
-
-        let event_type = parsed
-            .get("event")
-            .and_then(|ev| ev.get("e"))
-            .and_then(|v| v.as_str());
-
-        if event_type == Some("outboundAccountPosition") {
-            let data = parsed.get("event").unwrap_or(&parsed);
-            let ev = serde_json::from_value::<model::Account>(data.clone())?;
-            self.tx.send(ev).await?;
-            return Ok(());
-        }else{
-            Ok(())
+    pub async fn handle(&self, txt: &str) -> Result<(), Box<dyn Error>> {
+        let resp: Response = serde_json::from_str(txt)?;
+        if resp.status == 200 {
+            self.tx.send(resp.result).await?;
         }
-    
-    
+        Ok(())
+
     }
 }
 
 #[tokio::test]
-async fn test_binance_spot_user_stream_account_service() {
-    let (svc, mut rx) = AccountService::new();
+async fn test_binance_spot_ws_time_service() {
+    let (svc, mut rx) = TimeService::new();
 
-    let sample = r#"{
-        "subscriptionId": 0,
-        "event": {
-            "e": "outboundAccountPosition", 
-            "E": 1564034571105,             
-            "u": 1564034571073,             
-            "B":                            
-            [
-                {
-                    "a": "ETH",                
-                    "f": "10000.000000",        
-                    "l": "0.000000"            
-                }
-            ]
+    let sample = r#"
+        {
+        "id": "922bcc6e-9de8-440d-9e84-7c80933a8d0d",
+        "status": 200,
+        "result": {
+            "serverTime": 1656400526260
+            },
+        "rateLimits": [
+            {
+            "rateLimitType": "REQUEST_WEIGHT",
+            "interval": "MINUTE",
+            "intervalNum": 1,
+            "limit": 6000,
+            "count": 1
+            }
+        ]
         }
-        }"#;
+    "#;
 
-    svc.handle(sample).await.expect("outboundAccountPosition handle event");
-    let ev = rx.recv().await.expect("channel closed");
-    let vec = &ev.balances[0];
-    assert_eq!(vec.free, 10000.000000);
+    svc.handle(sample).await.expect("TimeService handle event");
+    let ev: Event = rx.recv().await.expect("channel closed");
+    let time = &ev.serverTime;
+    println!("{:?}",&ev);
+    assert_eq!(time, &1656400526260_i64);
 }

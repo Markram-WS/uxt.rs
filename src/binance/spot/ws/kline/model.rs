@@ -3,8 +3,9 @@
 use serde::{Deserialize};
 use crate::utils::convert::{str_to_f64};
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-pub struct KlineResponse {
+pub struct Response {
     pub id: String,
     pub status: u16,
     pub result: Vec<RawKline>,
@@ -12,6 +13,7 @@ pub struct KlineResponse {
     pub rate_limits: Vec<RateLimit>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct RateLimit {
     #[serde(rename = "rateLimitType")]
@@ -23,6 +25,7 @@ pub struct RateLimit {
     pub count: u32,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct RawKline(
     pub i64,
@@ -39,6 +42,7 @@ pub struct RawKline(
     pub serde_json::Value,
 );
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct Kline {
     pub open_time: i64,

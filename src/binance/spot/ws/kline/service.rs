@@ -4,6 +4,7 @@ use tokio::sync::{mpsc};
 use std::error::Error;
 
 type Event = model::Kline;
+type Response = model::Response;
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct KlineService {
@@ -36,14 +37,16 @@ impl KlineService {
     }
 
     pub async fn handle(&self, txt: &str) -> Result<(), Box<dyn Error>> {
-        let resp: model::KlineResponse = serde_json::from_str(txt)?;
+        let resp: Response = serde_json::from_str(txt)?;
 
         let klines: Vec<Event> = resp
             .result
             .into_iter()
             .map(|r| model::Kline::from(r))
             .collect();
-        self.tx.send(klines).await?;
+        if resp.status == 200 {
+            self.tx.send(klines).await?;
+        }
         Ok(())
 
     }

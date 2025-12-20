@@ -1,31 +1,31 @@
-use crate::utils::convert::{str_to_f64};
-use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
-pub struct AccountWrapper {
-    #[serde(rename = "subscriptionId")]
-    pub subscription_id: u64,
-    pub event: Account,
+
+use serde::{Deserialize};
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct Response {
+    pub id: String,
+    pub status: u16,
+    pub result: Time,
+    #[serde(rename = "rateLimits")]
+    pub rate_limits: Vec<RateLimit>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Account {
-    #[serde(rename = "e")]
-    pub event_type : String,
-    #[serde(rename = "E")]
-    pub event_time : i64,
-    #[serde(rename = "u")]
-    pub time_of_last_account_update : i64,
-    #[serde(rename = "B")]
-    pub balances : Vec<BalancesArray>,
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct RateLimit {
+    #[serde(rename = "rateLimitType")]
+    pub rate_limit_type: String,
+    pub interval: String,
+    #[serde(rename = "intervalNum")]
+    pub interval_num: u32,
+    pub limit: u32,
+    pub count: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BalancesArray {
-    #[serde(rename = "a")]
-    pub asset : String,
-    #[serde(rename = "f",deserialize_with = "str_to_f64")]
-    pub free : f64,
-    #[serde(rename = "l",deserialize_with = "str_to_f64")]
-    pub locked : f64,
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct Time {
+    pub serverTime: i64,
 }

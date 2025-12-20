@@ -1,31 +1,101 @@
+
+
+use serde::{Deserialize};
 use crate::utils::convert::{str_to_f64};
-use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
-pub struct AccountWrapper {
-    #[serde(rename = "subscriptionId")]
-    pub subscription_id: u64,
-    pub event: Account,
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct Response {
+    pub id: String,
+    pub status: u16,
+    pub result: OrderCancel,
+    #[serde(rename = "rateLimits")]
+    pub rate_limits: Vec<RateLimit>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Account {
-    #[serde(rename = "e")]
-    pub event_type : String,
-    #[serde(rename = "E")]
-    pub event_time : i64,
-    #[serde(rename = "u")]
-    pub time_of_last_account_update : i64,
-    #[serde(rename = "B")]
-    pub balances : Vec<BalancesArray>,
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct RateLimit {
+    #[serde(rename = "rateLimitType")]
+    pub rate_limit_type: String,
+    pub interval: String,
+    #[serde(rename = "intervalNum")]
+    pub interval_num: u32,
+    pub limit: u32,
+    pub count: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BalancesArray {
-    #[serde(rename = "a")]
-    pub asset : String,
-    #[serde(rename = "f",deserialize_with = "str_to_f64")]
-    pub free : f64,
-    #[serde(rename = "l",deserialize_with = "str_to_f64")]
-    pub locked : f64,
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+pub struct OrderCancel {
+    pub symbol: String,
+
+    #[serde(rename = "origClientOrderId")]
+    pub orig_client_order_id: String,
+
+    #[serde(rename = "orderId")]
+    pub order_id: i64,
+
+    #[serde(rename = "orderListId")]
+    pub order_list_id: i64,
+
+    #[serde(rename = "clientOrderId")]
+    pub client_order_id: String,
+
+    #[serde(rename = "transactTime")]
+    pub transact_time: i64,
+
+    #[serde(deserialize_with = "str_to_f64")]
+    pub price: f64,
+
+    #[serde(rename = "origQty", deserialize_with = "str_to_f64")]
+    pub orig_qty: f64,
+
+    #[serde(rename = "executedQty", deserialize_with = "str_to_f64")]
+    pub executed_qty: f64,
+
+    #[serde(rename = "origQuoteOrderQty", deserialize_with = "str_to_f64")]
+    pub orig_quote_order_qty: f64,
+
+    #[serde(rename = "cummulativeQuoteQty", deserialize_with = "str_to_f64")]
+    pub cummulative_quote_qty: f64,
+
+    pub status: String,
+
+    #[serde(rename = "timeInForce")]
+    pub time_in_force: String,
+
+    #[serde(rename = "type")]
+    pub order_type: String,
+
+    pub side: String,
+
+    // ----- optional fields -----
+
+    #[serde(
+        rename = "stopPrice",
+        deserialize_with = "str_to_f64",
+        default
+    )]
+    pub stop_price: f64,
+
+    #[serde(rename = "trailingDelta")]
+    pub trailing_delta: Option<i64>,
+
+    #[serde(
+        rename = "icebergQty",
+        deserialize_with = "str_to_f64",
+        default
+    )]
+    pub iceberg_qty: f64,
+
+    #[serde(rename = "strategyId")]
+    pub strategy_id: Option<i64>,
+
+    #[serde(rename = "strategyType")]
+    pub strategy_type: Option<i64>,
+
+    #[serde(rename = "selfTradePreventionMode")]
+    pub self_trade_prevention_mode: String,
 }

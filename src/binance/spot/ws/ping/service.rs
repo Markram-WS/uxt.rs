@@ -2,64 +2,60 @@ use serde_json::Value;
 use super::model;
 use tokio::sync::{mpsc};
 use std::error::Error;
-type Event = model::Account;
+
+#[derive(Debug, PartialEq)]
+pub enum Event {
+    Pong,
+}
+type Response = model::Response;
+
+
 #[allow(dead_code)]
 #[derive(Clone)]
-pub struct AccountService {
+pub struct PingService {
     tx: mpsc::Sender<Event>,
 }
 
 #[allow(dead_code)]
-impl AccountService {
+impl PingService {
     pub fn new() -> (Self, mpsc::Receiver<Event>) {
         let (tx, rx) = mpsc::channel(100);
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self,txt: &str) ->Result< (), Box<dyn Error>> {
-        let parsed: Value = serde_json::from_str(txt)?;
-
-        let event_type = parsed
-            .get("event")
-            .and_then(|ev| ev.get("e"))
-            .and_then(|v| v.as_str());
-
-        if event_type == Some("outboundAccountPosition") {
-            let data = parsed.get("event").unwrap_or(&parsed);
-            let ev = serde_json::from_value::<model::Account>(data.clone())?;
-            self.tx.send(ev).await?;
-            return Ok(());
-        }else{
-            Ok(())
+    pub async fn handle(&self, txt: &str) -> Result<(), Box<dyn Error>> {
+        let resp: Response = serde_json::from_str(txt)?;
+        if resp.status == 200 {
+            self.tx.send(Event::Pong).await?;
         }
-    
-    
+        Ok(())
+
     }
 }
 
 #[tokio::test]
-async fn test_binance_spot_user_stream_account_service() {
-    let (svc, mut rx) = AccountService::new();
+async fn test_binance_spot_ws_ping_service() {
+    let (svc, mut rx) = PingService::new();
 
-    let sample = r#"{
-        "subscriptionId": 0,
-        "event": {
-            "e": "outboundAccountPosition", 
-            "E": 1564034571105,             
-            "u": 1564034571073,             
-            "B":                            
-            [
-                {
-                    "a": "ETH",                
-                    "f": "10000.000000",        
-                    "l": "0.000000"            
-                }
-            ]
+    let sample = r#"
+        {
+        "id": "93fb61ef-89f8-4d6e-b022-4f035a3fadad",
+        "status": 200,
+        "result": {},
+        "rateLimits": [
+            {
+            "rateLimitType": "REQUEST_WEIGHT",
+            "interval": "MINUTE",
+            "intervalNum": 1,
+            "limit": 6000,
+            "count": 2
+            }
+        ]
         }
-        }"#;
+    "#;
 
-    svc.handle(sample).await.expect("outboundAccountPosition handle event");
-    let ev = rx.recv().await.expect("channel closed");
-    let vec = &ev.balances[0];
-    assert_eq!(vec.free, 10000.000000);
+    svc.handle(sample).await.expect("TickerService handle event");
+    let ev: Event = rx.recv().await.expect("channel closed");
+    println!("{:?}",&ev);
+    assert_eq!(ev, Event::Pong);
 }
