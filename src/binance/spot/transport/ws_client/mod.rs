@@ -1,15 +1,26 @@
 mod conn;
 mod role;
+mod event;
 
+use chrono::Utc;
 use conn::WsConn;
+use event::WsEvent;
 use role::WsRole;
+use serde_json::json;
+use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
 use serde::Serialize;
 use crate::binance::spot::{WsBuilder,StreamMode};
+use uuid::Uuid;
+use sqlx::Value;
+
 
 pub struct WsClient {
     conn: WsConn,
+    events: WsEvent,
     pub role: WsRole,
+    pub authed: bool,
+    pub last_logon: Option<i64>,
 }
 
 impl WsClient {
@@ -25,16 +36,29 @@ impl WsClient {
                 secret: builder.secret,
             },
         };
-
+        let (event_tx, event_rx) = mpsc::channel(1024);
+        let authed = false;
+        let last_logon  = None;
         Ok(Self {
             conn: WsConn::new(ws),
+            events: WsEvent::new(event_tx),
             role,
+            authed,
+            last_logon
         })
     }
 
     // -------- transport ----------
     pub async fn read_once(&mut self) -> anyhow::Result<Option<String>> {
         self.conn.read_once().await
+    }
+
+    pub async fn read_loop(&mut self) -> anyhow::Result<()> {
+        while let Some(txt) = self.read_once().await? {
+            let msg = serde_json::from_str(&txt)?;
+            self.events.dispatch(msg).await;
+        }
+        Ok(())
     }
 
     pub async fn close(&mut self) -> anyhow::Result<()> {
@@ -48,21 +72,52 @@ impl WsClient {
     }
     
     // -------- ws-api ----------
-    pub async fn send_wsapi(
+    pub async fn call_wsapi(
         &mut self,
-        id: &str,
         method: &str,
         params: serde_json::Value,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<serde_json::Value> {
+        let id = Uuid::new_v4().to_string();
         let params = self.role.sign_wsapi(params)?;
-
+    
         let req = serde_json::json!({
             "id": id,
             "method": method,
             "params": params
         });
-
-        self.conn.send_text(req.to_string()).await
+    
+        let rx = self.events.register(id);
+        self.conn.send_text(req.to_string()).await?;
+    
+        Ok(rx.await?)
     }
 
+    pub async fn logon(&mut self) -> anyhow::Result<()> {
+        match &self.role {
+            WsRole::WsApi { api_key, secret: _ } => {
+                let resp = self
+                    .call_wsapi("session.logon", json!({ "api_key": api_key }))
+                    .await?;
+    
+                if resp["status"] == 200 {
+                    self.authed = true;
+                    self.last_logon = Some(Utc::now().timestamp());
+                    Ok(())
+                } else {
+                    anyhow::bail!("logon failed: {:?}", resp);
+                }
+            }
+            _ => {
+                anyhow::bail!("logon called but WsRole is not WsApi");
+            }
+        }
+    }
+    
+
 }
+
+// next
+// timeout ของ pending
+// retry
+// typed event enum
+// map error code → Result
