@@ -92,7 +92,7 @@ impl WsClient {
         Ok(rx.await?)
     }
 
-    pub async fn logon(&mut self) -> anyhow::Result<()> {
+    pub async fn logon(&mut self) -> anyhow::Result<serde_json::Value> {
         match &self.role {
             WsRole::WsApi { api_key, secret: _ } => {
                 let resp = self
@@ -102,7 +102,12 @@ impl WsClient {
                 if resp["status"] == 200 {
                     self.authed = true;
                     self.last_logon = Some(Utc::now().timestamp());
-                    Ok(())
+                    let api_keys =  &resp["result"]["apiKey"];
+                    let authorized_since =  &resp["result"]["authorizedSince"];
+                    Ok(json!({ 
+                        "api_keys":api_keys,
+                        "authorized_since":authorized_since
+                    }))
                 } else {
                     anyhow::bail!("logon failed: {:?}", resp);
                 }
@@ -112,8 +117,53 @@ impl WsClient {
             }
         }
     }
-    
 
+    pub async fn logout(&mut self) -> anyhow::Result<serde_json::Value> {
+        match &self.role {
+            WsRole::WsApi { api_key, secret: _ } => {
+                let resp = self
+                    .call_wsapi("session.logout", json!({ }))
+                    .await?;
+                let api_keys =  &resp["result"]["apiKey"];
+                let authorized_since =  &resp["result"]["authorizedSince"];
+                if resp["status"] == 200  && api_keys.is_null()  {
+                    self.authed = false;
+                    Ok(json!({ 
+                        "api_keys":api_keys,
+                        "authorized_since":authorized_since
+                    }))
+                } else {
+                    anyhow::bail!("logout failed: {:?}", resp);
+                }
+            }
+            _ => {
+                anyhow::bail!("logout called but WsRole is not WsApi");
+            }
+        }
+    }
+    
+    pub async fn status(&mut self) -> anyhow::Result<serde_json::Value> {
+        match &self.role {
+            WsRole::WsApi { api_key, secret: _ } => {
+                let resp = self
+                    .call_wsapi("session.status", json!({ }))
+                    .await?;
+                if resp["status"] == 200  &&  resp["result"]["apiKey"].is_null() {
+                    let api_keys =  &resp["result"]["apiKey"];
+                    let authorized_since =  &resp["result"]["authorizedSince"];
+                    Ok(json!({ 
+                        "api_keys":api_keys,
+                        "authorized_since":authorized_since
+                    }))
+                } else {
+                    anyhow::bail!("status failed: {:?}", resp);
+                }
+            }
+            _ => {
+                anyhow::bail!("status called but WsRole is not WsApi");
+            }
+        }
+    }
 }
 
 // next
