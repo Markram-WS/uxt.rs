@@ -1,32 +1,30 @@
-use std::collections::HashMap;
-
-use tokio::sync::{mpsc, oneshot};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::{ mpsc, oneshot};
+use std::sync::Mutex;
+#[derive(Clone)]
 pub struct WsEvent {
-    pending: HashMap<String, oneshot::Sender<serde_json::Value>>,
-    event_tx: mpsc::Sender<serde_json::Value>,
+    // ใช้เก็บ oneshot สำหรับ call_wsapi
+    pending: Arc<Mutex<HashMap<String, oneshot::Sender<serde_json::Value>>>>,
 }
 
 impl WsEvent {
-    pub fn new(event_tx: mpsc::Sender<serde_json::Value>) -> Self {
-        Self {
-            pending: HashMap::new(),
-            event_tx,
-        }
+    pub fn new() -> Self {
+        Self { pending: Arc::new(Mutex::new(HashMap::new())) }
     }
 
-    pub fn register(&mut self, id: String) -> oneshot::Receiver<serde_json::Value> {
+    pub fn register(&self, id: String) -> oneshot::Receiver<serde_json::Value> {
         let (tx, rx) = oneshot::channel();
-        self.pending.insert(id, tx);
+        self.pending.lock().unwrap().insert(id, tx);
         rx
     }
 
-    pub async fn dispatch(&mut self, msg: serde_json::Value) {
+    pub fn dispatch(&self, msg: serde_json::Value) -> bool {
         if let Some(id) = msg.get("id").and_then(|v| v.as_str()) {
-            if let Some((_id, tx)) = self.pending.remove_entry(id) {
+            if let Some(tx) = self.pending.lock().unwrap().remove(id) {
                 let _ = tx.send(msg);
+                return true; // จัดการแล้ว (เป็น API Response)
             }
-        } else {
-            let _ = self.event_tx.send(msg).await;
         }
+        false // ยังไม่ได้จัดการ (อาจเป็น Stream Data)
     }
 }

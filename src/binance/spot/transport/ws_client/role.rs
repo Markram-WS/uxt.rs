@@ -8,6 +8,8 @@ pub enum WsRole {
     WsApi {
         api_key: String,
         secret: String,
+        authed:bool,
+        authorized_since:Option<i64>
     },
 }
 

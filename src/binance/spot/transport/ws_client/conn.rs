@@ -7,39 +7,21 @@ use tokio_tungstenite::{
 };
 use tokio::net::TcpStream;
 use futures_util::{SinkExt, StreamExt};
+use futures_util::stream::SplitSink;
 
-type WsSocket = WebSocketStream<MaybeTlsStream<TcpStream>>;
+type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
 
 pub struct WsConn {
-    ws: WsSocket,
+    ws: WsWriter,
 }
 
 impl WsConn {
-    pub fn new(ws: WsSocket) -> Self {
+    pub fn new(ws: WsWriter) -> Self {
         Self { ws }
     }
-
+    
     pub async fn send_text(&mut self, txt: String) -> anyhow::Result<()> {
         self.ws.send(Message::Text(txt.into())).await?;
-        Ok(())
-    }
-
-    pub async fn read_once(&mut self) -> anyhow::Result<Option<String>> {
-        match self.ws.next().await {
-            Some(Ok(Message::Text(txt))) => Ok(Some(txt.to_string())),
-            Some(Ok(_)) => Ok(None),
-            Some(Err(e)) => Err(e.into()),
-            None => Ok(None),
-        }
-    }
-
-    pub async fn close(&mut self) -> anyhow::Result<()> {
-        self.ws
-            .close(Some(CloseFrame {
-                code: CloseCode::Normal,
-                reason: "client shutdown".into(),
-            }))
-            .await?;
         Ok(())
     }
 }
