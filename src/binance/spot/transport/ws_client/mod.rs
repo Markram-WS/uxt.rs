@@ -1,6 +1,8 @@
 mod conn;
 mod role;
 mod event;
+
+use chrono::Utc;
 use conn::WsConn;
 use event::WsEvent;
 use role::WsRole;
@@ -10,10 +12,9 @@ use tokio_tungstenite::connect_async;
 use serde::Serialize;
 use crate::binance::spot::{WsBuilder,StreamMode};
 use uuid::Uuid;
-use std::{sync::Arc, time::Duration};
+use std::{time::Duration};
 use anyhow::anyhow;
 use tokio::time::timeout;
-use tokio::sync::Mutex;
 
 
 
@@ -43,35 +44,36 @@ impl WsClient {
                 secret: builder.secret,
             },
         };
-        let (event_tx, _) = mpsc::channel(1024);
-
-        let client = Arc::new(Mutex::new(Self {
+        let (event_tx, _event_rx) = mpsc::channel(1024);
+        let mut client = Self {
             conn: WsConn::new(ws),
             events: WsEvent::new(event_tx),
             role,
             authed: false,
             authorized_since: None,
             timeout_sec: 10,
-        }));
+        };
+        let mut reader = client.conn.clone_for_reader(); 
+        let mut events = client.events.clone_for_reader(); 
 
-        // ---------- WS READ LOOP (หัวใจของระบบ) ----------
-        let reader: Arc<_> = Arc::clone(&client);
         tokio::spawn(async move {
-            let _ = reader.create_events_read().await;
+            loop {
+                match reader.read_once().await {
+                    Ok(Some(txt)) => {
+                        if let Ok(msg) = serde_json::from_str(&txt) {
+                            events.dispatch(msg).await;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        eprintln!("ws read error: {e}");
+                        break;
+                    }
+                }
+            }
         });
-        let authed = false;
-        let authorized_since  = None;
-        let timeout_sec:u64 = 10;
-        Ok(
-            Self {
-            conn: WsConn::new(ws),
-            events: WsEvent::new(event_tx),
-            role,
-            authed,
-            authorized_since,
-            timeout_sec
-        }
-        )
+
+        Ok(client)
     }
 
     pub async fn set_timeout(mut self, timeout_sec:u64) {
@@ -81,14 +83,6 @@ impl WsClient {
     // -------- transport ----------
     pub async fn read_once(&mut self) -> anyhow::Result<Option<String>> {
         self.conn.read_once().await
-    }
-
-    pub async fn create_events_read(&mut self) -> anyhow::Result<()> {
-        while let Some(txt) = self.read_once().await? {
-            let msg = serde_json::from_str(&txt)?;
-            self.events.dispatch(msg).await;
-        }
-        Ok(())
     }
 
     pub async fn close(&mut self) -> anyhow::Result<()> {

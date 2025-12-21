@@ -18,7 +18,11 @@ impl WsConn {
     pub fn new(ws: WsSocket) -> Self {
         Self { ws }
     }
-
+    pub fn clone_for_reader(&self) -> WsConn {
+        WsConn {
+            ws: self.ws.clone(),
+        }
+    }
     pub async fn send_text(&mut self, txt: String) -> anyhow::Result<()> {
         self.ws.send(Message::Text(txt.into())).await?;
         Ok(())

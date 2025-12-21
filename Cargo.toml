@@ -28,3 +28,4 @@ futures-util = "0.3.31"
 tracing = "0.1.43"
 reqwest = { version = "0.12.23", features = ["json", "rustls-tls"] }
 log = "0.4.29"
+dashmap = "6.1.0"
