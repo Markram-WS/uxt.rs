@@ -1,8 +1,6 @@
 mod conn;
 mod role;
 mod event;
-
-use chrono::Utc;
 use conn::WsConn;
 use event::WsEvent;
 use role::WsRole;
@@ -12,7 +10,12 @@ use tokio_tungstenite::connect_async;
 use serde::Serialize;
 use crate::binance::spot::{WsBuilder,StreamMode};
 use uuid::Uuid;
-use sqlx::Value;
+use std::{sync::Arc, time::Duration};
+use anyhow::anyhow;
+use tokio::time::timeout;
+use tokio::sync::Mutex;
+
+
 
 
 pub struct WsClient {
@@ -20,11 +23,15 @@ pub struct WsClient {
     events: WsEvent,
     pub role: WsRole,
     pub authed: bool,
-    pub last_logon: Option<i64>,
+    pub authorized_since: Option<i64>,
+    pub timeout_sec: u64
+
+
+
 }
 
 impl WsClient {
-    pub async fn connect(builder: WsBuilder) -> anyhow::Result<Self> {
+    pub async fn connect(builder: WsBuilder) -> anyhow::Result<(Self)> {
         let url = builder.base_url.clone();
         let (ws, _) = connect_async(&url).await?;
 
@@ -36,16 +43,39 @@ impl WsClient {
                 secret: builder.secret,
             },
         };
-        let (event_tx, event_rx) = mpsc::channel(1024);
+        let (event_tx, _) = mpsc::channel(1024);
+
+        let client = Arc::new(Mutex::new(Self {
+            conn: WsConn::new(ws),
+            events: WsEvent::new(event_tx),
+            role,
+            authed: false,
+            authorized_since: None,
+            timeout_sec: 10,
+        }));
+
+        // ---------- WS READ LOOP (หัวใจของระบบ) ----------
+        let reader: Arc<_> = Arc::clone(&client);
+        tokio::spawn(async move {
+            let _ = reader.create_events_read().await;
+        });
         let authed = false;
-        let last_logon  = None;
-        Ok(Self {
+        let authorized_since  = None;
+        let timeout_sec:u64 = 10;
+        Ok(
+            Self {
             conn: WsConn::new(ws),
             events: WsEvent::new(event_tx),
             role,
             authed,
-            last_logon
-        })
+            authorized_since,
+            timeout_sec
+        }
+        )
+    }
+
+    pub async fn set_timeout(mut self, timeout_sec:u64) {
+        self.timeout_sec = timeout_sec;
     }
 
     // -------- transport ----------
@@ -53,7 +83,7 @@ impl WsClient {
         self.conn.read_once().await
     }
 
-    pub async fn read_loop(&mut self) -> anyhow::Result<()> {
+    pub async fn create_events_read(&mut self) -> anyhow::Result<()> {
         while let Some(txt) = self.read_once().await? {
             let msg = serde_json::from_str(&txt)?;
             self.events.dispatch(msg).await;
@@ -88,32 +118,38 @@ impl WsClient {
     
         let rx = self.events.register(id);
         self.conn.send_text(req.to_string()).await?;
-    
-        Ok(rx.await?)
+
+        let resp: serde_json::Value = timeout(Duration::from_secs(self.timeout_sec), rx)
+            .await
+            .map_err(|_| anyhow!("WS API request {} timeout\n",method))??;
+        if resp["status"] == 200 {
+            Ok(resp)
+        }
+        else{
+            anyhow::bail!("{} failed: {:?}",method, resp);
+        }
+        
     }
 
     pub async fn logon(&mut self) -> anyhow::Result<serde_json::Value> {
         match &self.role {
             WsRole::WsApi { api_key, secret: _ } => {
-                let resp = self
+                let resp: serde_json::Value = self
                     .call_wsapi("session.logon", json!({ "api_key": api_key }))
                     .await?;
     
-                if resp["status"] == 200 {
-                    self.authed = true;
-                    self.last_logon = Some(Utc::now().timestamp());
-                    let api_keys =  &resp["result"]["apiKey"];
-                    let authorized_since =  &resp["result"]["authorizedSince"];
-                    Ok(json!({ 
-                        "api_keys":api_keys,
-                        "authorized_since":authorized_since
-                    }))
-                } else {
-                    anyhow::bail!("logon failed: {:?}", resp);
-                }
+               
+                self.authed = true;
+                let api_keys =  &resp["result"]["apiKey"];
+                self.authorized_since = resp["result"]["authorizedSince"].clone().as_i64();
+                Ok(json!({ 
+                    "api_keys":api_keys,
+                    "authorized_since":self.authorized_since
+                }))
+              
             }
             _ => {
-                anyhow::bail!("logon called but WsRole is not WsApi");
+                anyhow::bail!("\nlogon called but WsRole is not WsApi");
             }
         }
     }
@@ -124,16 +160,12 @@ impl WsClient {
                 let resp = self
                     .call_wsapi("session.logout", json!({ }))
                     .await?;
-                let api_keys =  &resp["result"]["apiKey"];
-                if resp["status"] == 200  && api_keys.is_null()  {
-                    self.authed = false;
-                    Ok(())
-                } else {
-                    anyhow::bail!("logout failed: {:?}", resp);
-                }
+                self.authed = false;
+                Ok(())
+              
             }
             _ => {
-                anyhow::bail!("logout called but WsRole is not WsApi");
+                anyhow::bail!("\nlogout called but WsRole is not WsApi");
             }
         }
     }
@@ -144,17 +176,17 @@ impl WsClient {
                 let resp = self
                     .call_wsapi("session.status", json!({ }))
                     .await?;
-                if resp["status"] == 200  &&  !resp["result"]["apiKey"].is_null() {
+                if resp["result"]["apiKey"].is_null() {
                     let mut json_res = resp["rateLimits"].clone();
                     json_res["authorizedSince"] =  resp["result"]["authorizedSince"].clone();
                     json_res["apiKey"]= resp["result"]["apiKey"].clone();
                     Ok(json!(json_res))
                 } else {
-                    anyhow::bail!("status failed: {:?}", resp);
+                    anyhow::bail!("\nstatus failed apiKey null : {:?} ", resp);
                 }
             }
             _ => {
-                anyhow::bail!("status called but WsRole is not WsApi");
+                anyhow::bail!("\nstatus called but WsRole is not WsApi");
             }
         }
     }
@@ -168,21 +200,17 @@ impl WsClient {
                         .call_wsapi("ping", json!({  }))
                         .await?;
         
-                        if resp["status"] == 200 {
-                            let rate_limit = &resp["rateLimits"] ;
-                            Ok(json!(rate_limit))
-                        } else {
-                            anyhow::bail!("ping failed: {:?}", resp);
-                        }
+                        let rate_limit = &resp["rateLimits"] ;
+                        Ok(json!(rate_limit))
                     }
                     _ => {
-                        anyhow::bail!("ping called but authed must be logon");
+                        anyhow::bail!("\nping called but authed must be logon");
                     }
                 }
 
             }
             _ => {
-                anyhow::bail!("ping called but WsRole is not WsApi");
+                anyhow::bail!("\nping called but WsRole is not WsApi");
             }
         }
     }
@@ -196,29 +224,21 @@ impl WsClient {
                         .call_wsapi("time", json!({}))
                         .await?;
         
-                        if resp["status"] == 200 {
-                            let server_time = resp["result"]["serverTime"].as_i64();
-                            Ok(server_time)
-                        } else {
-                            anyhow::bail!("ping failed: {:?}", resp);
-                        }
+                      
+                        let server_time = resp["result"]["serverTime"].as_i64();
+                        Ok(server_time)
+                    
                     }
                     _ => {
-                        anyhow::bail!("ping called but authed must be logon");
+                        anyhow::bail!("\nping called but authed must be logon");
                     }
                 }
 
             }
             _ => {
-                anyhow::bail!("ping called but WsRole is not WsApi");
+                anyhow::bail!("\nping called but WsRole is not WsApi");
             }
         }
     }
 
 }
-
-// next
-// timeout ของ pending
-// retry
-// typed event enum
-// map error code → Result
