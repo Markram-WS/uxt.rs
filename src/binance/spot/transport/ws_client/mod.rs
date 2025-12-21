@@ -118,20 +118,16 @@ impl WsClient {
         }
     }
 
-    pub async fn logout(&mut self) -> anyhow::Result<serde_json::Value> {
+    pub async fn logout(&mut self) -> anyhow::Result<()> {
         match &self.role {
             WsRole::WsApi { api_key, secret: _ } => {
                 let resp = self
                     .call_wsapi("session.logout", json!({ }))
                     .await?;
                 let api_keys =  &resp["result"]["apiKey"];
-                let authorized_since =  &resp["result"]["authorizedSince"];
                 if resp["status"] == 200  && api_keys.is_null()  {
                     self.authed = false;
-                    Ok(json!({ 
-                        "api_keys":api_keys,
-                        "authorized_since":authorized_since
-                    }))
+                    Ok(())
                 } else {
                     anyhow::bail!("logout failed: {:?}", resp);
                 }
@@ -148,13 +144,11 @@ impl WsClient {
                 let resp = self
                     .call_wsapi("session.status", json!({ }))
                     .await?;
-                if resp["status"] == 200  &&  resp["result"]["apiKey"].is_null() {
-                    let api_keys =  &resp["result"]["apiKey"];
-                    let authorized_since =  &resp["result"]["authorizedSince"];
-                    Ok(json!({ 
-                        "api_keys":api_keys,
-                        "authorized_since":authorized_since
-                    }))
+                if resp["status"] == 200  &&  !resp["result"]["apiKey"].is_null() {
+                    let mut json_res = resp["rateLimits"].clone();
+                    json_res["authorizedSince"] =  resp["result"]["authorizedSince"].clone();
+                    json_res["apiKey"]= resp["result"]["apiKey"].clone();
+                    Ok(json!(json_res))
                 } else {
                     anyhow::bail!("status failed: {:?}", resp);
                 }
@@ -164,6 +158,63 @@ impl WsClient {
             }
         }
     }
+
+    pub async fn ping(&mut self) -> anyhow::Result<serde_json::Value> {
+        match &self.role {
+            WsRole::WsApi { api_key, secret: _ } => {
+                match &self.authed {
+                    true => {
+                        let resp = self
+                        .call_wsapi("ping", json!({  }))
+                        .await?;
+        
+                        if resp["status"] == 200 {
+                            let rate_limit = &resp["rateLimits"] ;
+                            Ok(json!(rate_limit))
+                        } else {
+                            anyhow::bail!("ping failed: {:?}", resp);
+                        }
+                    }
+                    _ => {
+                        anyhow::bail!("ping called but authed must be logon");
+                    }
+                }
+
+            }
+            _ => {
+                anyhow::bail!("ping called but WsRole is not WsApi");
+            }
+        }
+    }
+
+    pub async fn time(&mut self) -> anyhow::Result<Option<i64>> {
+        match &self.role {
+            WsRole::WsApi { api_key, secret: _ } => {
+                match &self.authed {
+                    true => {
+                        let resp = self
+                        .call_wsapi("time", json!({}))
+                        .await?;
+        
+                        if resp["status"] == 200 {
+                            let server_time = resp["result"]["serverTime"].as_i64();
+                            Ok(server_time)
+                        } else {
+                            anyhow::bail!("ping failed: {:?}", resp);
+                        }
+                    }
+                    _ => {
+                        anyhow::bail!("ping called but authed must be logon");
+                    }
+                }
+
+            }
+            _ => {
+                anyhow::bail!("ping called but WsRole is not WsApi");
+            }
+        }
+    }
+
 }
 
 // next
