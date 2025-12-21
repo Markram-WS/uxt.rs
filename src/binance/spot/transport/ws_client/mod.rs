@@ -53,26 +53,6 @@ impl WsClient {
             authorized_since: None,
             timeout_sec: 10,
         };
-        let mut reader = client.conn.clone_for_reader(); 
-        let mut events = client.events.clone_for_reader(); 
-
-        tokio::spawn(async move {
-            loop {
-                match reader.read_once().await {
-                    Ok(Some(txt)) => {
-                        if let Ok(msg) = serde_json::from_str(&txt) {
-                            events.dispatch(msg).await;
-                        }
-                    }
-                    Ok(None) => break,
-                    Err(e) => {
-                        eprintln!("ws read error: {e}");
-                        break;
-                    }
-                }
-            }
-        });
-
         Ok(client)
     }
 
