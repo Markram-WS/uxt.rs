@@ -74,16 +74,17 @@ mod tests {
                     }
         
                     msg = ws_client.read_once() => {
-                        let Some(txt) = msg.expect("ws read error") else {
-                            break; // ws closed
-                        };
-        
-                        orderservice.handle(&txt).await
+                        if let Some(json) = msg {
+                            
+                        
+                        orderservice.handle(&json).await
                             .expect("orderservice error");
-                        accountservice.handle(&txt).await
+                        accountservice.handle(&json).await
                             .expect("accountservice error");
-                        balanceservice.handle(&txt).await
+                        balanceservice.handle(&json).await
                             .expect("balanceservice error");
+                    };
+        
                     }
                 }
             }

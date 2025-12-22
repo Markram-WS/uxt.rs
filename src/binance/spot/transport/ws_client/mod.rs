@@ -2,12 +2,13 @@ mod conn;
 mod role;
 mod event;
 
+use chrono::Utc;
 use conn::WsConn;
 use event::WsEvent;
 use futures::StreamExt;
 use role::WsRole;
 use serde_json::json;
-use tokio::sync::mpsc;
+use tokio::sync::mpsc::{self};
 use tokio_tungstenite::connect_async;
 use serde::Serialize;
 use crate::binance::spot::{WsBuilder,StreamMode};
@@ -18,13 +19,15 @@ use tokio::time::timeout;
 
 
 
-
 pub struct WsClient {
     conn: WsConn,
     events: WsEvent,
     stream_rx: mpsc::UnboundedReceiver<serde_json::Value>, // ถังพักสำหรับ read_once
     pub role: WsRole,
-    pub timeout_sec: u64,
+    pub authed:bool,
+    pub authorized_since:Option<i64>,
+    pub timeout_sec: i64,
+
 }
 
 impl WsClient {
@@ -35,17 +38,28 @@ impl WsClient {
         let (stream_tx, stream_rx) = mpsc::unbounded_channel();
         let events = WsEvent::new();
         let events_clone = events.clone();
+
+        //---authed--
+        let mut authed = false;
+        let mut authorized_since = None;
+        //---role--
         let role: WsRole = match builder.mode {
-            StreamMode::Public => WsRole::Public,
-            StreamMode::UserData => WsRole::UserData,
+            StreamMode::Public => {
+                authed = true;
+                authorized_since = Some(Utc::now().timestamp_millis());
+                WsRole::Public
+            },
+            StreamMode::UserData => {
+                authed = true;
+                authorized_since = Some(Utc::now().timestamp_millis());
+                WsRole::UserData
+            },
             StreamMode::WsApi => WsRole::WsApi {
                 api_key: builder.api_key,
-                secret: builder.secret,
-                authed:false,
-                authorized_since:None,
-
+                secret: builder.secret
             },
         };
+
         // --- Background Loop: ตัวแยกประเภทข้อมูล ---
         tokio::spawn(async move {
             while let Some(Ok(msg)) = reader.next().await {
@@ -66,14 +80,20 @@ impl WsClient {
             events,
             stream_rx,
             role,
+            authed,
+            authorized_since,
             timeout_sec: 10,
         })
     }
 
-    pub async fn set_timeout(mut self, timeout_sec:u64) {
+    pub async fn set_timeout(mut self, timeout_sec:i64) {
         self.timeout_sec = timeout_sec;
     }
 
+    pub async fn close(&mut self) -> Result<(), anyhow::Error> {
+        self.conn.close().await?;
+        Ok(())
+    }
     // -------- transport ----------
     pub async fn read_once(&mut self) -> Option<serde_json::Value> {
         self.stream_rx.recv().await
@@ -94,60 +114,42 @@ impl WsClient {
         let req = json!({ "id": id, "method": method, "params": params });
         self.conn.send_text(req.to_string()).await?;
 
-        timeout(Duration::from_secs(self.timeout_sec), rx).await??
+        timeout(Duration::from_secs(self.timeout_sec.try_into()?), rx).await??
             .as_object()
             .ok_or_else(|| anyhow!("Invalid response"))
             .map(|obj| serde_json::Value::Object(obj.clone()))
     }
 
     pub async fn logon(&mut self) -> anyhow::Result<serde_json::Value> {
-        // 1. ดึงเฉพาะ api_key ออกมา (Clone ออกมาเพื่อไม่ให้ติด Borrow)
-        let api_key_to_use = if let WsRole::WsApi { ref api_key, .. } = self.role {
-            api_key.clone()
-        } else {
-            anyhow::bail!("logon called but WsRole is not WsApi");
-        };
-    
-        // 2. เรียก call_wsapi ได้อย่างอิสระ เพราะ self ไม่ได้ถูกยืมแล้ว
-        let resp: serde_json::Value = self
-            .call_wsapi("session.logon", json!({ "api_key": api_key_to_use }))
-            .await?;
-    
-        // 3. กลับมาอัปเดตค่าใน role หลังจากได้คำตอบ
-        if let WsRole::WsApi { ref mut authed, ref mut authorized_since, .. } = self.role {
-            *authed = true;
-            *authorized_since = resp["result"]["authorizedSince"].as_i64();
-            
-            let api_keys = &resp["result"]["apiKey"];
-            
-            Ok(json!({ 
-                "api_keys": api_keys,
-                "authorized_since": *authorized_since
-            }))
-        } else {
-            // เคสนี้ปกติจะไม่เกิดขึ้นเพราะเช็คไปแล้วข้างบน แต่ Rust บังคับให้จัดการ
-            anyhow::bail!("WsRole changed unexpectedly");
+
+        match &self.role {
+            WsRole::WsApi {  api_key ,.. } => {
+                let _resp = self.call_wsapi("session.logon", json!({ "api_key": &api_key })).await?;
+                self.authed = true;
+                self.authorized_since = _resp["result"]["authorizedSince"].as_i64();
+
+                let mut json_res = _resp["rateLimits"].clone();
+                json_res["authorizedSince"] =  _resp["result"]["authorizedSince"].clone();
+                json_res["apiKey"]= _resp["result"]["apiKey"].clone();
+                Ok(json!(json_res))
+            }      
+            _ => {
+                anyhow::bail!("\nlogout called but WsRole is not WsApi");
+            }
         }
     }
 
     pub async fn logout(&mut self) -> anyhow::Result<()> {
-        // 1. ตรวจสอบ Role ก่อน (ยืมแค่ชั่วคราวแล้วจบไป)
-        let is_ws_api = matches!(self.role, WsRole::WsApi { .. });
-        
-        if !is_ws_api {
-            anyhow::bail!("\nlogout called but WsRole is not WsApi");
-        }
-    
-        // 2. เรียกใช้ call_wsapi (ตอนนี้ self ว่างแล้ว เพราะการตรวจสอบข้างบนจบลงแล้ว)
-        let _resp = self.call_wsapi("session.logout", json!({})).await?;
-    
-        // 3. กลับมาอัปเดตค่าใน role (ยืม mutable อีกรอบหลังจากได้คำตอบ)
-        if let WsRole::WsApi { ref mut authed, .. } = self.role {
-            *authed = false;
-            Ok(())
-        }else {
-            anyhow::bail!("\nlogout failed apiKey null : {:?} ", _resp);
 
+        match &mut self.role {
+            WsRole::WsApi {  .. } => {
+                let _resp = self.call_wsapi("session.logout", json!({})).await?;
+                self.authed = false;
+                Ok(())
+            }      
+            _ => {
+                anyhow::bail!("\nlogout called but WsRole is not WsApi");
+            }
         }
     }
 
@@ -174,8 +176,8 @@ impl WsClient {
 
     pub async fn ping(&mut self) -> anyhow::Result<serde_json::Value> {
         match &mut self.role {
-            WsRole::WsApi { authed, ..} => {
-                match &authed {
+            WsRole::WsApi {..} => {
+                match self.authed {
                     true => {
                         let resp = self
                         .call_wsapi("ping", json!({  }))
@@ -198,8 +200,8 @@ impl WsClient {
 
     pub async fn time(&mut self) -> anyhow::Result<Option<i64>> {
         match &self.role {
-            WsRole::WsApi {  authed,.. } => {
-                match &authed {
+            WsRole::WsApi {  .. } => {
+                match self.authed {
                     true => {
                         let resp = self
                         .call_wsapi("time", json!({}))

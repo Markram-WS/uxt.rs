@@ -16,8 +16,8 @@ impl OrderService {
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self,txt: &str) ->Result< (), Box<dyn Error>> {
-        let parsed: Value = serde_json::from_str(txt)?;
+    pub async fn handle(&self,parsed:&serde_json::Value) ->Result< (), Box<dyn Error>> {
+        //let parsed: Value = serde_json::from_str(txt)?;
     
         let event_type = parsed
             .get("event")
@@ -83,8 +83,8 @@ async fn test_binance_spot_user_stream_order_service() {
         }
         }
         "#;
-
-    svc.handle(sample).await.expect("executionReport handle event");
+    let sample_json = serde_json::from_str(sample).unwrap();
+    svc.handle(&sample_json).await.expect("executionReport handle event");
 
     let ev = rx.recv().await.expect("channel closed");
     assert_eq!(ev.order_id, 4293153);

@@ -60,13 +60,11 @@ mod tests {
             loop {
                 tokio::select! {        
                     msg = ws_client.read_once() => {
-                        let Some(txt) = msg.expect("ws read error") else {
-                            break; // ws closed
-                        };
-        
-                        klineservice.handle(&txt).await.expect("`Err` klineservice message handling");
-                        tradeservice.handle(&txt).await.expect("`Err` tradeservice message handling");
-                        tickerservice.handle(&txt).await.expect("`Err` tickerservice message handling");
+                        if let Some(json) = msg {
+                            klineservice.handle(&json).await.expect("`Err` klineservice message handling");
+                            tradeservice.handle(&json).await.expect("`Err` tradeservice message handling");
+                            tickerservice.handle(&json).await.expect("`Err` tickerservice message handling");
+                        }
                     }
                 }
             }

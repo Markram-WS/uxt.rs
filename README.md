@@ -3,7 +3,7 @@
 #### Binance Spot Trading API
 https://developers.binance.com/docs/binance-spot-api-docs/websocket-api/user-data-stream-requests
 
-
+### SET ENV File or Kube secret / config
 #### ENV
 - BINANCE_API
 - BINANCE_SECRET
@@ -11,3 +11,10 @@ https://developers.binance.com/docs/binance-spot-api-docs/websocket-api/user-dat
 - BINANCE_WS_SPOT_PUBLIC_ENDPOINT 
 - BINANCE_WS_SPOT_USERDATA_ENDPOINT
 - BINANCE_WS_SPOT_API_ENDPOINT
+#### ENV TEST
+- BINANCE_API_TEST
+- BINANCE_SECRET_TEST
+- BINANCE_REST_SPOT_API_ENDPOINT_TEST
+- BINANCE_WS_SPOT_PUBLIC_ENDPOINT_TEST
+- BINANCE_WS_SPOT_USERDATA_ENDPOINT_TEST
+- BINANCE_WS_SPOT_API_ENDPOINT_TEST

@@ -1,3 +1,5 @@
+use reqwest::header::Values;
+use serde::de::value;
 use serde_json::Value;
 use super::model;
 use tokio::sync::{mpsc};
@@ -17,8 +19,8 @@ impl KlineService {
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self,txt:&str) ->Result< (), Box<dyn Error>> {
-        let parsed: Value = serde_json::from_str(txt)?;
+    pub async fn handle(&self,parsed:&serde_json::Value) ->Result< (), Box<dyn Error>> {
+        //let parsed: Value = serde_json::from_str(txt)?;
     
         let event_type = parsed.get("e")
             .or_else(|| parsed.get("data").and_then(|d| d.get("e")))
@@ -66,8 +68,8 @@ async fn test_binance_spot_pub_stream_kline_service() {
             "B": "123456" 
         }
     }"#;
-
-    svc.handle(sample).await.expect("kline handle event");
+ let sample_json = serde_json::from_str(sample).unwrap();   
+    svc.handle(&sample_json).await.expect("kline handle event");
 
     let ev = rx.recv().await.expect("channel closed");
     assert_eq!(ev.data.close, 0.0020);
