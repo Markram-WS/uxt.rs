@@ -6,7 +6,10 @@ use std::fmt::Debug;
 #[derive(Debug)]
 pub enum WsRole {
     Public,
-    UserData,
+    UserData{
+        api_key: String,
+        secret: String,
+    },
     WsApi {
         api_key: String,
         secret: String,
@@ -16,17 +19,19 @@ pub enum WsRole {
 impl WsRole {
     pub fn api_key(&self) -> Result<&str, anyhow::Error>{
         match self {
-            WsRole::WsApi { api_key, .. } => Ok(api_key),
-            _ => anyhow::bail!("api_key not available"),
-        }
-    }
-    pub fn secret(&self) -> Result<&str, anyhow::Error> {
-        match self {
-            WsRole::WsApi { secret, .. } => Ok(secret),
-            _ => anyhow::bail!("secret not available"),
+            WsRole::WsApi {  api_key,.. } => Ok(&api_key) ,
+            WsRole::UserData {  api_key,.. } => Ok(&api_key),
+            WsRole::Public =>anyhow::bail!("public api_key not available")
         }
     }
 
+    pub fn secret(&self) -> Result<&str, anyhow::Error> {
+        match self {
+            WsRole::WsApi {  secret,.. } => Ok(&secret) ,
+            WsRole::UserData {  secret,.. } => Ok(&secret),
+            WsRole::Public =>anyhow::bail!("public secret not available")
+        }
+    }
 
     pub fn sign_wsapi(&self, mut params: Value) -> anyhow::Result<Value> {
         match self {
