@@ -17,9 +17,9 @@ impl UserDataRestService {
                 None
             )
             .await?;
-
-        let body = res.json::<ListenKeyResponse>().await?;
-        Ok(body.listenKey)
+        let bytes = res.bytes().await?;
+        let body: ListenKeyResponse = serde_json::from_slice(&bytes)?;
+        Ok(body.listen_key)
     }
 
     /// PUT /api/v3/userDataStream

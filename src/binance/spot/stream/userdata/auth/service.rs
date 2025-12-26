@@ -20,7 +20,7 @@ impl UserDataAuthService {
             id: Uuid::new_v4().to_string(),
             method: "userDataStream.subscribe.signature".into(),
             params: UserDataSubscribeParams {
-                apiKey: client.role.api_key()?.to_string(),
+                api_key: client.role.api_key()?.to_string(),
                 timestamp: ts,
                 signature,
             },

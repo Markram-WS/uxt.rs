@@ -1,6 +1,7 @@
 
 use crate::utils::convert::{str_to_f64};
 use serde::{Deserialize, Serialize};
+#[allow(dead_code)]
 #[derive(Serialize)]
 pub struct OrderWrapper {
     #[serde(rename = "subscriptionId")]

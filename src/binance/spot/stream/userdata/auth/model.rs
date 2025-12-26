@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UserDataSubscribeParams {
-    pub apiKey: String,
+    pub api_key: String,
     pub timestamp: i64,
     pub signature: String,
 }

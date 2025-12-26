@@ -1,7 +1,6 @@
 
 use crate::utils::env::get_env;
 use crate::binance::spot::public::Interval; 
-
 pub enum MarketType {
     Spot,
     Futures, // future support
@@ -15,6 +14,7 @@ pub enum StreamMode {
 }
 
 pub struct WsBuilder {
+    #[allow(dead_code)]
     market: MarketType,
     pub mode: StreamMode,
     streams: Vec<String>,
@@ -41,6 +41,7 @@ impl WsBuilder {
 
     pub fn spot(api_key: &str, secret: &str) -> Self {
         Self::new(MarketType::Spot, api_key, secret)
+        
     }
 
     pub fn futures(api_key: &str, secret: &str) -> Self {

@@ -56,7 +56,7 @@ mod tests {
         let (tickerservice, mut rx_ticker) = TickerService::new();
 
 
-        let ws_task = tokio::spawn(async move {
+        tokio::spawn(async move {
             loop {
                 tokio::select! {        
                     msg = ws_client.read_once() => {

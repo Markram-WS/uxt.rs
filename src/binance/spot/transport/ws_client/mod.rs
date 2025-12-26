@@ -42,6 +42,8 @@ impl WsClient {
         //---authed--
         let mut authed = false;
         let mut authorized_since = None;
+        println!("builder api_key {}",&builder.api_key);
+        println!("builder secret {}",&builder.secret);
         //---role--
         let role: WsRole = match builder.mode {
             StreamMode::Public => {
@@ -57,8 +59,10 @@ impl WsClient {
             StreamMode::WsApi => WsRole::WsApi {
                 api_key: builder.api_key,
                 secret: builder.secret
-            },
+            }
         };
+
+        
 
         // --- Background Loop: ตัวแยกประเภทข้อมูล ---
         tokio::spawn(async move {

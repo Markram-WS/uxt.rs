@@ -1,6 +1,7 @@
-use serde::Deserialize;
+use serde::{Deserialize,Serialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ListenKeyResponse {
-    pub listenKey: String,
+    #[serde(rename = "listenKey")]
+    pub listen_key: String,
 }

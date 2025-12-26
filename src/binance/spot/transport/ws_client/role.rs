@@ -1,7 +1,9 @@
 use chrono::Utc;
 use serde_json::Value;
 use crate::utils::sign;
+use std::fmt::Debug;
 
+#[derive(Debug)]
 pub enum WsRole {
     Public,
     UserData,

@@ -9,7 +9,6 @@ mod tests {
     use dotenvy::dotenv;
     use utx::binance::spot::{WsBuilder,WsClient};
     use utx::utils::{get_env};
-    use tokio::time::{timeout, Duration};
     use std::time::{SystemTime, UNIX_EPOCH};
     static INIT: Once = Once::new();
     
