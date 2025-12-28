@@ -1,5 +1,4 @@
 use super::model;
-use tokio::sync::{mpsc};
 use std::error::Error;
 
 type Event = model::OrderCancel;
@@ -9,7 +8,6 @@ use serde::ser::StdError;
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct OrderCancelService {
-    tx: mpsc::Sender<Event>,
 }
 /// Calls the authenticated WebSocket API to cancel an order.
 ///
@@ -49,10 +47,7 @@ pub struct OrderCancelService {
 ///     "timestamp": 1660801715830
 /// });
 ///
-/// let (svc, mut rx) = OrderCancelService::new();
-/// svc.call(&ws, param).await?;
-///
-/// let ev = rx.recv().await?;
+/// let ev:model::OrderCancel = OrderCancelService.call(&ws, param).await?;
 /// ```
 ///
 /// # Notes
@@ -62,34 +57,27 @@ pub struct OrderCancelService {
 ///   at a higher level.
 #[allow(dead_code)]
 impl OrderCancelService {
-    pub fn new() -> (Self, mpsc::Receiver<Event>) {
-        let (tx, rx) = mpsc::channel(100);
-        (Self { tx }, rx)
-    }
 
-    pub async fn call(self,mut ws:WsClient,param:serde_json::Value) -> Result<(), Box<dyn StdError>> {
+    pub async fn call(mut ws:WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
         let method = "order.cancel";
         log::debug!("{} param : {:#}", method, param);
         let res = ws.call_wsapi(method, param).await?;
-        log::debug!("{} ok : {:#}", method, res);
-        self.handle(res).await?;
-        Ok(())
+        log::debug!("{} ok : {:#}", method, &res);
+        Ok(OrderCancelService::handle(res).await?)
     }
 
-    pub async fn handle(&self, json: serde_json::Value) -> Result<(), Box<dyn Error>> {
+    pub async fn handle( json: serde_json::Value) -> Result<Event, Box<dyn Error>> {
         let resp:Response = serde_json::from_value(json)?;
         if resp.status == 200 {
-            self.tx.send(resp.result).await?;
+            Ok(resp.result)
+        } else {
+            Err(format!("unexpected status: {}", resp.status).into())
         }
-        Ok(())
-
     }
 }
 
 #[tokio::test]
 async fn test_binance_spot_ws_order_cancle_service() {
-    let (svc, mut rx) = OrderCancelService::new();
-
     let sample = r#"
         {
         "id": "5633b6a2-90a9-4192-83e7-925c90b6a2fd",
@@ -129,8 +117,7 @@ async fn test_binance_spot_ws_order_cancle_service() {
         }
     "#;
 
-    svc.handle(serde_json::from_str(sample).expect("`Err` convert json value") ).await.expect("OrderCancelService handle event");
-    let ev: Event = rx.recv().await.expect("channel closed");
+    let ev: Event = OrderCancelService::handle(serde_json::from_str(sample).expect("`Err` convert json value") ).await.expect("OrderCancelService handle event");
     let order_id = &ev.order_id;
     let price = &ev.price;
     println!("{:?}",&ev);

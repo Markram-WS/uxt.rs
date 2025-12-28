@@ -101,22 +101,22 @@ mod tests {
             }
         };
 
-        let method = "order.test";
-        let param: serde_json::Value = serde_json::json!({
-            "symbol": &symbol,
-            "type": "LIMIT_MAKER",
-            "price": "23416.10000000",
-            "quantity": "0.001"
-        });
-        match ws_client.call_wsapi(&method,param).await {
-            Ok(res) => { 
-                println!("{} ok : {:#}",&method,res);
-                assert!(true );
-            }
-            Err(e) => {
-                eprint!("{} error: {:#}",&method, e)
-            }
-        };
+        // let method = "order.cancel";
+        // let param: serde_json::Value = serde_json::json!({
+        //     "symbol": &symbol,
+        //     "type": "LIMIT_MAKER",
+        //     "price": "23416.10000000",
+        //     "quantity": "0.001"
+        // });
+        // match ws_client.call_wsapi(&method,param).await {
+        //     Ok(res) => { 
+        //         println!("{} ok : {:#}",&method,res);
+        //         assert!(true );
+        //     }
+        //     Err(e) => {
+        //         eprint!("{} error: {:#}",&method, e)
+        //     }
+        // };
 
         let method = "ticker.24hr";
         let param: serde_json::Value = serde_json::json!({

@@ -1,5 +1,4 @@
 use super::model;
-use tokio::sync::{mpsc};
 use std::error::Error;
 type Event = model::Ticker;
 type Response = model::Response;
@@ -7,9 +6,7 @@ use crate::binance::spot::{WsClient};
 use serde::ser::StdError;
 #[allow(dead_code)]
 #[derive(Clone)]
-pub struct TickerService {
-    tx: mpsc::Sender<Event>,
-}
+pub struct TickerService {}
 /// Call websocket API to fetch Ticker data.
 ///
 /// # Arguments
@@ -22,40 +19,31 @@ pub struct TickerService {
 /// let param = serde_json::json!({
 ///     "symbol": "BTCUSDT",
 /// });
-/// let (svc, mut rx) = TickerService::new();
-/// svc::call(&ws, param).await?;
-/// let ev: model::Ticker = rx.recv().await?;
+/// 
+/// let ev: model::Ticker = TickerService::call(&ws, param).await?;
 /// ```
 #[allow(dead_code)]
 impl TickerService {
-    pub fn new() -> (Self, mpsc::Receiver<Event>) {
-        let (tx, rx) = mpsc::channel(100);
-        (Self { tx }, rx)
-    }
-
-    pub async fn call(self,mut ws:WsClient,param:serde_json::Value) -> Result<(), Box<dyn StdError>> {
+    pub async fn call(mut ws:WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
         let method = "ticker.24hr";
         log::debug!("{} param : {:#}", method, param);
         let res = ws.call_wsapi(method, param).await?;
-        log::debug!("{} ok : {:#}", method, res);
-        self.handle(res).await?;
-        Ok(())
+        log::debug!("{} ok : {:#}", method, &res);
+        Ok(TickerService::handle(res).await?)
     }
 
-    pub async fn handle(&self, json: serde_json::Value) -> Result<(), Box<dyn Error>> {
-        let resp:Response = serde_json::from_value(json)?;
+    pub async fn handle( json: serde_json::Value) -> Result<Event, Box<dyn Error>> {
+        let resp: Response = serde_json::from_value(json)?;
         if resp.status == 200 {
-            self.tx.send(resp.result).await?;
+            Ok(resp.result)
+        } else {
+            Err(format!("unexpected status: {}", resp.status).into())
         }
-        Ok(())
-
     }
 }
 
 #[tokio::test]
 async fn test_binance_spot_ws_ticker_service() {
-    let (svc, mut rx) = TickerService::new();
-
     let sample = r#"
         {
         "id": "93fb61ef-89f8-4d6e-b022-4f035a3fadad",
@@ -95,8 +83,10 @@ async fn test_binance_spot_ws_ticker_service() {
         }
     "#;
 
-    svc.handle(serde_json::from_str(sample).expect("`Err` convert json value")).await.expect("TickerService handle event");
-    let ev: Event = rx.recv().await.expect("channel closed");
+    
+    let ev: Event = TickerService::handle(
+        serde_json::from_str(sample).expect("`Err` convert json value")
+    ).await.expect("TickerService handle event");
     let last_price = &ev.last_price;
     let symbol: &String = &ev.symbol;
     println!("{:?}",&ev);

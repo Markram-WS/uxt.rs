@@ -9,7 +9,6 @@ use crate::binance::spot::{WsClient};
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct KlineService {
-    tx: mpsc::Sender<Vec<Event>>,
 }
 
 impl From<model::RawKline> for model::Kline {
@@ -50,43 +49,36 @@ impl From<model::RawKline> for model::Kline {
 ///     "startTime": 1710000000,
 ///     "limit": 1
 /// });
-/// let (svc, mut rx) = KlineService::new();
-/// svc::call(&ws, param).await?;
-/// let ev: Vec<model::Kline> = rx.recv().await?;
+///
+/// let ev: Vec<model::Kline> = KlineService::call(&ws, param).await?;
 /// ```
-    pub fn new() -> (Self, mpsc::Receiver<Vec<Event>>) {
-        let (tx, rx) = mpsc::channel(100);
-        (Self { tx }, rx)
-    }
 
-    pub async fn call(self,ws:&mut WsClient,param:serde_json::Value) -> Result<(), Box<dyn StdError>> {
+    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> Result<Vec<model::Kline>, Box<dyn StdError>> {
         let method = "klines";
         log::debug!("{} param : {:#}", method, param);
         let res = ws.call_wsapi(method, param).await?;
-        log::debug!("{} ok : {:#}", method, res);
-        self.handle(res).await?;
-        Ok(())
+        log::debug!("{} ok : {:#}", method, &res);
+        Ok(KlineService::handle(res).await?)
     }
 
-    pub async fn handle(&self, json: serde_json::Value) -> Result<(), Box<dyn Error>> {
+    pub async fn handle( json: serde_json::Value) -> Result<Vec<model::Kline>, Box<dyn Error>> {
         let resp:Response = serde_json::from_value(json)?;
-        let klines: Vec<Event> = resp
+        if resp.status == 200 {
+            let klines: Vec<Event> = resp
             .result
             .into_iter()
             .map(|r| model::Kline::from(r))
             .collect();
-        if resp.status == 200 {
-            self.tx.send(klines).await?;
+            Ok(klines)
+        } else {
+            Err(format!("unexpected status: {}", resp.status).into())
         }
-        Ok(())
 
     }
 }
 
 #[tokio::test]
 async fn test_binance_spot_ws_kline_service() {
-    let (svc, mut rx) = KlineService::new();
-
     let sample = r#"{
         "id": "1dbbeb56-8eea-466a-8f6e-86bdcfa2fc0b",
         "status": 200,
@@ -115,10 +107,8 @@ async fn test_binance_spot_ws_kline_service() {
             "count": 2
             }
         ]
-        }"#;
-
-    svc.handle( serde_json::from_str(sample).expect("`Err` convert json value") ).await.expect("KlineService handle event");
-    let ev: Vec<model::Kline> = rx.recv().await.expect("channel closed");
+        }"#;        
+    let ev: Vec<model::Kline> = KlineService::handle( serde_json::from_str(sample).expect("`Err` convert json value") ).await.expect("KlineService handle event");
     let open_time = &ev[0].open_time;
     let open_price = &ev[0].open;
     println!("{:?}",&ev[0]);

@@ -1,5 +1,4 @@
 use super::model;
-use tokio::sync::{mpsc};
 use std::error::Error;
 type Event = model::OrderCreat;
 type Response = model::Response;
@@ -8,9 +7,7 @@ use serde::ser::StdError;
 
 #[allow(dead_code)]
 #[derive(Clone)]
-pub struct OrderCreatService {
-    tx: mpsc::Sender<Event>,
-}
+pub struct OrderCreatService {}
 /// Calls the authenticated WebSocket API to create a new order.
 ///
 /// This function submits a `createOrder` request through an already
@@ -56,11 +53,8 @@ pub struct OrderCreatService {
 ///     "signature": "xxxxxxxxxxxxxxxxxxxxxxx",
 ///     "timestamp": 1660801715431
 /// });
-///
-/// let (svc, mut rx) = OrderCreateService::new();
-/// svc.call(&ws, param).await?;
-///
-/// let ev = rx.recv().await?;
+/// 
+/// let ev:model::OrderCreat = OrderCreateService::call(&ws, param).await?;
 /// ```
 ///
 /// # Notes
@@ -72,34 +66,27 @@ pub struct OrderCreatService {
 
 #[allow(dead_code)]
 impl OrderCreatService {
-    pub fn new() -> (Self, mpsc::Receiver<Event>) {
-        let (tx, rx) = mpsc::channel(100);
-        (Self { tx }, rx)
-    }
 
-    pub async fn call(self,mut ws:WsClient,param:serde_json::Value) -> Result<(), Box<dyn StdError>> {
+    pub async fn call(mut ws:WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
         let method = "order.place";
         log::debug!("{} param : {:#}", method, param);
         let res = ws.call_wsapi(method, param).await?;
-        log::debug!("{} ok : {:#}", method, res);
-        self.handle(res).await?;
-        Ok(())
+        log::debug!("{} ok : {:#}", method, &res);
+        Ok(OrderCreatService::handle(res).await?)
     }
 
-    pub async fn handle(&self, json: serde_json::Value) -> Result<(), Box<dyn Error>> {
+    pub async fn handle( json: serde_json::Value) -> Result<Event, Box<dyn Error>> {
         let resp:Response = serde_json::from_value(json)?;
         if resp.status == 200 {
-            self.tx.send(resp.result).await?;
+            Ok(resp.result)
+        } else {
+            Err(format!("unexpected status: {}", resp.status).into())
         }
-        Ok(())
-
     }
 }
 
 #[tokio::test]
 async fn test_binance_spot_ws_order_creat_service() {
-    let (svc, mut rx) = OrderCreatService::new();
-
     let sample = r#"
         {
         "id": "56374a46-3061-486b-a311-99ee972eb648",
@@ -149,8 +136,8 @@ async fn test_binance_spot_ws_order_creat_service() {
         }
     "#;
 
-    svc.handle(serde_json::from_str(sample).expect("`Err` convert json value")).await.expect("OrderCreatService handle event");
-    let ev: Event = rx.recv().await.expect("channel closed");
+    
+    let ev: Event = OrderCreatService::handle(serde_json::from_str(sample).expect("`Err` convert json value")).await.expect("OrderCreatService handle event");
     let order_id = &ev.order_id;
     let price = &ev.price;
     println!("{:?}",&ev);
