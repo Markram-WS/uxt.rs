@@ -1,14 +1,74 @@
 use super::model;
 use tokio::sync::{mpsc};
 use std::error::Error;
-
 type Event = model::OrderCreat;
 type Response = model::Response;
+use crate::binance::spot::{WsClient};
+use serde::ser::StdError;
+
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct OrderCreatService {
     tx: mpsc::Sender<Event>,
 }
+/// Calls the authenticated WebSocket API to create a new order.
+///
+/// This function submits a `createOrder` request through an already
+/// authenticated [`WsClient`].  
+/// On success, the order result will be processed by the service
+/// and emitted through its event channel.
+///
+/// # Arguments
+///
+/// * `ws` - An authenticated WebSocket client.  
+///   The client **must be logged in** before calling this function.
+/// * `param` - JSON parameters required for the create order request:
+///   * `symbol` (`String`) - Trading pair symbol (e.g. `"BTCUSDT"`)
+///   * `side` (`String`) - Order side (`"BUY"` or `"SELL"`)
+///   * `type` (`String`) - Order type (e.g. `"LIMIT"`, `"MARKET"`)
+///   * `timeInForce` (`String`) - Order execution policy (e.g. `"GTC"`)
+///   * `price` (`String`) - Order price (required for limit orders)
+///   * `quantity` (`String`) - Order quantity
+///   * `apiKey` (`String`) - API key for authentication
+///   * `signature` (`String`) - Request signature
+///   * `timestamp` (`u64`) - Request timestamp in milliseconds
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The WebSocket request fails
+/// - The exchange returns an order rejection or validation error
+/// - The response cannot be parsed or handled correctly
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use serde_json::json;
+///
+/// let param = json!({
+///     "symbol": "BTCUSDT",
+///     "side": "SELL",
+///     "type": "LIMIT",
+///     "timeInForce": "GTC",
+///     "price": "23416.10000000",
+///     "quantity": "0.00847000",
+///     "apiKey": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+///     "signature": "xxxxxxxxxxxxxxxxxxxxxxx",
+///     "timestamp": 1660801715431
+/// });
+///
+/// let (svc, mut rx) = OrderCreateService::new();
+/// svc.call(&ws, param).await?;
+///
+/// let ev = rx.recv().await?;
+/// ```
+///
+/// # Notes
+///
+/// - This function performs network I/O and has side effects.
+/// - Order validation (e.g. price/quantity precision) should be
+///   handled before calling this function.
+/// - Retry or reconciliation logic should be implemented at a higher level.
 
 #[allow(dead_code)]
 impl OrderCreatService {
@@ -17,8 +77,17 @@ impl OrderCreatService {
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self, txt: &str) -> Result<(), Box<dyn Error>> {
-        let resp: Response = serde_json::from_str(txt)?;
+    pub async fn call(self,mut ws:WsClient,param:serde_json::Value) -> Result<(), Box<dyn StdError>> {
+        let method = "order.place";
+        log::debug!("{} param : {:#}", method, param);
+        let res = ws.call_wsapi(method, param).await?;
+        log::debug!("{} ok : {:#}", method, res);
+        self.handle(res).await?;
+        Ok(())
+    }
+
+    pub async fn handle(&self, json: serde_json::Value) -> Result<(), Box<dyn Error>> {
+        let resp:Response = serde_json::from_value(json)?;
         if resp.status == 200 {
             self.tx.send(resp.result).await?;
         }
@@ -80,7 +149,7 @@ async fn test_binance_spot_ws_order_creat_service() {
         }
     "#;
 
-    svc.handle(sample).await.expect("OrderCreatService handle event");
+    svc.handle(serde_json::from_str(sample).expect("`Err` convert json value")).await.expect("OrderCreatService handle event");
     let ev: Event = rx.recv().await.expect("channel closed");
     let order_id = &ev.order_id;
     let price = &ev.price;

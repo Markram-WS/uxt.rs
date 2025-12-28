@@ -24,7 +24,7 @@ impl KlineService {
             .and_then(|v| v.as_str());
     
         if event_type == Some("kline") {
-            let data = parsed.get("data").unwrap_or(&parsed);
+            let data: &serde_json::Value = parsed.get("data").unwrap_or(&parsed);
             let ev = serde_json::from_value::<Event>(data.clone())?;
             self.tx.send(ev).await?;
             return Ok(());

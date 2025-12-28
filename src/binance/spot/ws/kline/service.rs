@@ -1,9 +1,11 @@
 use super::model;
 use tokio::sync::{mpsc};
 use std::error::Error;
-
+use serde::ser::StdError;
+use log;
 type Event = model::Kline;
 type Response = model::Response;
+use crate::binance::spot::{WsClient};
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct KlineService {
@@ -29,15 +31,45 @@ impl From<model::RawKline> for model::Kline {
 }
 
 #[allow(dead_code)]
-impl KlineService {
+    impl KlineService {
+/// Call websocket API to fetch kline (candlestick) data.
+///
+/// # Arguments
+/// - `ws` - Authenticated websocket client
+/// - `param` - JSON parameters for kline request:
+///   - `symbol` (`String`) : trading pair symbol (e.g. "BTCUSDT")
+///   - `interval` (`String`) : kline interval (e.g. "1h")
+///   - `startTime` (`u64`) : unix timestamp (seconds)
+///   - `limit` (`u32`) : number of klines to fetch
+///
+/// # Example
+/// ```rust
+/// let param = serde_json::json!({
+///     "symbol": "BTCUSDT",
+///     "interval": "1h",
+///     "startTime": 1710000000,
+///     "limit": 1
+/// });
+/// let (svc, mut rx) = KlineService::new();
+/// svc::call(&ws, param).await?;
+/// let ev: Vec<model::Kline> = rx.recv().await?;
+/// ```
     pub fn new() -> (Self, mpsc::Receiver<Vec<Event>>) {
         let (tx, rx) = mpsc::channel(100);
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self, txt: &str) -> Result<(), Box<dyn Error>> {
-        let resp: Response = serde_json::from_str(txt)?;
+    pub async fn call(self,ws:&mut WsClient,param:serde_json::Value) -> Result<(), Box<dyn StdError>> {
+        let method = "klines";
+        log::debug!("{} param : {:#}", method, param);
+        let res = ws.call_wsapi(method, param).await?;
+        log::debug!("{} ok : {:#}", method, res);
+        self.handle(res).await?;
+        Ok(())
+    }
 
+    pub async fn handle(&self, json: serde_json::Value) -> Result<(), Box<dyn Error>> {
+        let resp:Response = serde_json::from_value(json)?;
         let klines: Vec<Event> = resp
             .result
             .into_iter()
@@ -85,7 +117,7 @@ async fn test_binance_spot_ws_kline_service() {
         ]
         }"#;
 
-    svc.handle(sample).await.expect("KlineService handle event");
+    svc.handle( serde_json::from_str(sample).expect("`Err` convert json value") ).await.expect("KlineService handle event");
     let ev: Vec<model::Kline> = rx.recv().await.expect("channel closed");
     let open_time = &ev[0].open_time;
     let open_price = &ev[0].open;
