@@ -53,7 +53,7 @@ impl From<model::RawKline> for model::Kline {
 /// let ev: Vec<model::Kline> = KlineService::call(&ws, param).await?;
 /// ```
 
-    pub async fn call(mut ws:WsClient,param:serde_json::Value) -> Result<Vec<model::Kline>, Box<dyn StdError>> {
+    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> Result<Vec<model::Kline>, Box<dyn StdError>> {
         let method = "klines";
         log::debug!("{} param : {:#}", method, param);
         let res = ws.call_wsapi(method, param).await?;

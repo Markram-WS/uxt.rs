@@ -58,10 +58,11 @@ pub struct OrderCancelService {
 #[allow(dead_code)]
 impl OrderCancelService {
 
-    pub async fn call(mut ws:WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
+    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
         let method = "order.cancel";
         log::debug!("{} param : {:#}", method, param);
-        let res = ws.call_wsapi(method, param).await?;
+        let param_siged = ws.role.sign_wsapi(param)?;
+        let res = ws.call_wsapi(method, param_siged).await?;
         log::debug!("{} ok : {:#}", method, &res);
         Ok(OrderCancelService::handle(res).await?)
     }

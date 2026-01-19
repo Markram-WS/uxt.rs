@@ -24,7 +24,7 @@ pub struct TickerService {}
 /// ```
 #[allow(dead_code)]
 impl TickerService {
-    pub async fn call(mut ws:WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
+    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
         let method = "ticker.24hr";
         log::debug!("{} param : {:#}", method, param);
         let res = ws.call_wsapi(method, param).await?;

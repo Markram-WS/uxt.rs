@@ -36,6 +36,8 @@ impl WsRole {
     pub fn sign_wsapi(&self, mut params: Value) -> anyhow::Result<Value> {
         match self {
             WsRole::WsApi { secret, .. } => {
+                params["apiKey"] = self.api_key().unwrap().into();
+
                 let ts = Utc::now().timestamp_millis();
                 params["timestamp"] = ts.into();
 

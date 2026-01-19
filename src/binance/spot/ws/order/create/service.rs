@@ -67,10 +67,11 @@ pub struct OrderCreatService {}
 #[allow(dead_code)]
 impl OrderCreatService {
 
-    pub async fn call(mut ws:WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
-        let method = "order.place";
-        log::debug!("{} param : {:#}", method, param);
-        let res = ws.call_wsapi(method, param).await?;
+    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
+        let method: &str = "order.place";
+        log::debug!("{} param : {:#}", method, &param);
+        let param_siged = ws.role.sign_wsapi(param)?;
+        let res = ws.call_wsapi(method, param_siged).await?;
         log::debug!("{} ok : {:#}", method, &res);
         Ok(OrderCreatService::handle(res).await?)
     }
