@@ -1,11 +1,9 @@
 use super::model;
-use tokio::sync::{mpsc};
-use std::error::Error;
-use serde::ser::StdError;
 use log;
 type Event = model::Kline;
 type Response = model::Response;
 use crate::binance::spot::{WsClient};
+use anyhow;
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct KlineService {
@@ -53,7 +51,7 @@ impl From<model::RawKline> for model::Kline {
 /// let ev: Vec<model::Kline> = KlineService::call(&ws, param).await?;
 /// ```
 
-    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> Result<Vec<model::Kline>, Box<dyn StdError>> {
+    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> anyhow::Result<Vec<model::Kline>> {
         let method = "klines";
         log::debug!("{} param : {:#}", method, param);
         let res = ws.call_wsapi(method, param).await?;
@@ -61,7 +59,7 @@ impl From<model::RawKline> for model::Kline {
         Ok(KlineService::handle(res).await?)
     }
 
-    pub async fn handle( json: serde_json::Value) -> Result<Vec<model::Kline>, Box<dyn Error>> {
+    pub async fn handle( json: serde_json::Value) -> anyhow::Result<Vec<model::Kline>> {
         let resp:Response = serde_json::from_value(json)?;
         if resp.status == 200 {
             let klines: Vec<Event> = resp
@@ -71,7 +69,7 @@ impl From<model::RawKline> for model::Kline {
             .collect();
             Ok(klines)
         } else {
-            Err(format!("unexpected status: {}", resp.status).into())
+            anyhow::bail!("unexpected status: {}", resp.status)
         }
 
     }

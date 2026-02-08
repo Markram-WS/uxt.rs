@@ -1,10 +1,10 @@
 use super::model;
 use std::error::Error;
-
 type Event = model::OrderCancel;
 type Response = model::Response;
 use crate::binance::spot::{WsClient};
 use serde::ser::StdError;
+use anyhow;
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct OrderCancelService {
@@ -58,7 +58,7 @@ pub struct OrderCancelService {
 #[allow(dead_code)]
 impl OrderCancelService {
 
-    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
+    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> anyhow::Result<Event>  {
         let method = "order.cancel";
         log::debug!("{} param : {:#}", method, param);
         let param_siged = ws.role.sign_wsapi(param)?;
@@ -67,12 +67,12 @@ impl OrderCancelService {
         Ok(OrderCancelService::handle(res).await?)
     }
 
-    pub async fn handle( json: serde_json::Value) -> Result<Event, Box<dyn Error>> {
+    pub async fn handle( json: serde_json::Value) -> anyhow::Result<Event> {
         let resp:Response = serde_json::from_value(json)?;
         if resp.status == 200 {
             Ok(resp.result)
         } else {
-            Err(format!("unexpected status: {}", resp.status).into())
+            anyhow::bail!("order.cancel, unexpected status: {}", resp.status)
         }
     }
 }

@@ -1,12 +1,11 @@
 use super::model;
-use std::error::Error;
 type Event = model::Ticker;
 type Response = model::Response;
 use crate::binance::spot::{WsClient};
-use serde::ser::StdError;
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct TickerService {}
+use anyhow;
 /// Call websocket API to fetch Ticker data.
 ///
 /// # Arguments
@@ -24,7 +23,7 @@ pub struct TickerService {}
 /// ```
 #[allow(dead_code)]
 impl TickerService {
-    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> Result<Event, Box<dyn StdError>> {
+    pub async fn call(ws:&mut WsClient,param:serde_json::Value) -> anyhow::Result<Event> {
         let method = "ticker.24hr";
         log::debug!("{} param : {:#}", method, param);
         let res = ws.call_wsapi(method, param).await?;
@@ -32,12 +31,12 @@ impl TickerService {
         Ok(TickerService::handle(res).await?)
     }
 
-    pub async fn handle( json: serde_json::Value) -> Result<Event, Box<dyn Error>> {
+    pub async fn handle( json: serde_json::Value) -> anyhow::Result<Event> {
         let resp: Response = serde_json::from_value(json)?;
         if resp.status == 200 {
             Ok(resp.result)
         } else {
-            Err(format!("unexpected status: {}", resp.status).into())
+            anyhow::bail!("ticker.24hr, unexpected status: {}", resp.status)
         }
     }
 }
