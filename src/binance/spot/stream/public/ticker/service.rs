@@ -1,6 +1,6 @@
 use super::model;
 use tokio::sync::{mpsc};
-use std::error::Error;
+use anyhow;
 type Event = model::Ticker;
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -15,7 +15,7 @@ impl TickerService {
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self,parsed:&serde_json::Value) ->Result< (), Box<dyn Error>> {
+    pub async fn handle(&self,parsed:&serde_json::Value) ->anyhow::Result<()> {
         //let parsed: Value = serde_json::from_str(txt)?;
     
         let event_type = parsed.get("e")

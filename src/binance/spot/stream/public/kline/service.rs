@@ -1,8 +1,7 @@
 use super::model;
 use tokio::sync::{mpsc};
 type Event = model::Kline;
-use std::error::Error;
-
+use anyhow;
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct KlineService {
@@ -16,7 +15,7 @@ impl KlineService {
         (Self { tx }, rx)
     }
 
-    pub async fn handle(&self,parsed:&serde_json::Value) ->Result< (), Box<dyn Error>> {
+    pub async fn handle(&self,parsed:&serde_json::Value) ->anyhow::Result<()> {
         //let parsed: Value = serde_json::from_str(txt)?;
     
         let event_type = parsed.get("e")

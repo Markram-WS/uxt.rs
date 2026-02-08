@@ -14,9 +14,9 @@ use serde::Serialize;
 use crate::binance::spot::{WsBuilder,StreamMode};
 use uuid::Uuid;
 use std::{time::Duration};
-use anyhow::anyhow;
-use tokio::time::timeout;
 
+use tokio::time::timeout;
+use anyhow;
 
 
 pub struct WsClient {
@@ -120,7 +120,7 @@ impl WsClient {
 
         timeout(Duration::from_secs(self.timeout_sec.try_into()?), rx).await??
             .as_object()
-            .ok_or_else(|| anyhow!("Invalid response"))
+            .ok_or_else(|| anyhow::anyhow!("Invalid response"))
             .map(|obj| serde_json::Value::Object(obj.clone()))
     }
 

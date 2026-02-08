@@ -1,9 +1,7 @@
 use super::model;
-use std::error::Error;
 type Event = model::OrderCancel;
 type Response = model::Response;
 use crate::binance::spot::{WsClient};
-use serde::ser::StdError;
 use anyhow;
 #[allow(dead_code)]
 #[derive(Clone)]
