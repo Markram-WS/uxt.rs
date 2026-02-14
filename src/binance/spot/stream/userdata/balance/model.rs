@@ -9,7 +9,7 @@ pub struct BalanceWrapper {
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct Balance {
     #[serde(rename = "e")]
     pub event_type : String,

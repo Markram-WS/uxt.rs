@@ -10,7 +10,7 @@ pub struct OrderWrapper {
 }
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize,Clone)]
 pub struct Order {
     #[serde(rename = "e")]
     pub event_type: String,
