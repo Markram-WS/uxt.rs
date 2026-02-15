@@ -26,7 +26,7 @@ pub struct RateLimit {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize,Clone)]
 pub struct OrderCreat {
     pub symbol: String,
 
