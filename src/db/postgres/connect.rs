@@ -17,11 +17,7 @@ pub async fn create()  -> Result<sqlx::Pool<sqlx::Postgres>,sqlx::Error> {
     let db_url = format!("postgresql://{}:{}@{}:{}/{}",&db_user_decode,&db_password_decode,&db_host,&db_port,&db_stage);
     
     //------
-    let db_app_id =  get_env("APP_ID") ;
-    let db_suffix_schema = get_env("SUFFIX") ;
-    let asset = get_env("SYMBOL");
-        
-    let schema = format!("{}{}_{}",&asset,&db_suffix_schema,&db_app_id[..5]);
+    let schema = get_env("SCHEMA");         
     println!( "schema : {}",&schema );
     println!( "url : {}",&db_url );
     let pool: sqlx::Pool<sqlx::Postgres> = PgPool::connect(&db_url).await?;
@@ -41,8 +37,7 @@ mod tests {
             env::set_var("POSTGRES_PASSWORD", "dGVzdA==");
             env::set_var("DB_PORT", "10776");
             env::set_var("STAGE", "dev");
-            env::set_var("APP_ID", "PuxFgnIYYZcpjyzD");
-            env::set_var("SUFFIX", "");
+            env::set_var("SCHEMA", "TEST");
             env::set_var("SYMBOL", "usd");
         };
 
