@@ -1,6 +1,6 @@
 use chrono::Utc;
 use serde_json::Value;
-use crate::utils::sign;
+use crate::utils::sign_ed25519;
 use std::fmt::Debug;
 
 #[derive(Debug)]
@@ -42,7 +42,7 @@ impl WsRole {
                 params["timestamp"] = ts.into();
 
                 let query = format!("timestamp={}", ts);
-                let sig = sign(secret, &query);
+                let sig = sign_ed25519(secret, &query);
                 params["signature"] = sig.into();
 
                 Ok(params)

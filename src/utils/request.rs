@@ -14,6 +14,16 @@ pub fn sign(secret: &str, payload: &str) -> String {
     hex::encode(mac.finalize().into_bytes())
 }
 
+pub fn sign_ed25519(private_key_base64: &str, payload: &str) -> String {
+    let key_bytes = general_purpose::STANDARD
+        .decode(private_key_base64)
+        .expect("Failed to decode base64 private key");
+    let signing_key = SigningKey::from_pkcs8_der(&key_bytes)
+        .expect("Invalid Ed25519 PKCS#8 Key");
+    let signature = signing_key.sign(payload.as_bytes());
+    general_purpose::STANDARD.encode(signature.to_bytes())
+}
+
 pub fn create_signature( payload: &Vec<(&str, String)>,private_key:&str) ->  Result<String, Box<dyn std::error::Error>> {
     let query_string  = serde_urlencoded::to_string(&payload).expect("url params encode failed");
     let key_bytes = general_purpose::STANDARD.decode(private_key)?;
