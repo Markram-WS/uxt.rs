@@ -116,6 +116,7 @@ impl WsClient {
         let rx = self.events.register(id.clone());
         
         let req = json!({ "id": id, "method": method, "params": params });
+        log::debug!("call_wsapi {:?}",&req);
         self.conn.send_text(req.to_string()).await?;
 
         timeout(Duration::from_secs(self.timeout_sec.try_into()?), rx).await??

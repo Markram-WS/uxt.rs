@@ -42,7 +42,7 @@ mod tests {
             env::set_var("POSTGRES_PASSWORD", "dGVzdA==");
             env::set_var("DB_PORT", "10776");
             env::set_var("STAGE", "dev");
-            env::set_var("SCHEMA", "TEST");
+            env::set_var("SCHEMA", "test");
             env::set_var("SYMBOL", "usd");
         };
 
