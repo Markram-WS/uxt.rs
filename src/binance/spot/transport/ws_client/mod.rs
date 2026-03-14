@@ -131,13 +131,12 @@ impl WsClient {
                 log::info!("session.logon");
                 let param_siged = self.role.sign_wsapi(json!({ "apiKey": &api_key }))?;
                 let _resp: serde_json::Value = self.call_wsapi("session.logon", param_siged).await?;
-                self.authed = true;
-                self.authorized_since = _resp["result"]["authorizedSince"].as_i64();
-
-                let mut json_res = _resp["rateLimits"].clone();
-                json_res["authorizedSince"] =  _resp["result"]["authorizedSince"].clone();
-                json_res["apiKey"]= _resp["result"]["apiKey"].clone();
-                Ok(json!(json_res))
+                if let Some(result) = _resp.get("result") {
+                    self.authed = true;
+                    Ok(json!(result))
+                } else {
+                    Err(anyhow::anyhow!("No 'result' field in response: {:?}", _resp))
+                }
             }      
             _ => {
                 anyhow::bail!("\nlogout called but WsRole is not WsApi");
