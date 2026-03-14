@@ -1,9 +1,10 @@
 
 use sqlx::postgres::PgPool;
-
+use log;
 use crate::utils::{get_env, get_env_decode};
 #[allow(unused_imports)]
 use sqlx::Row ;
+use url::Url;
 
 
 pub async fn create()  -> Result<sqlx::Pool<sqlx::Postgres>,sqlx::Error> {
@@ -18,8 +19,12 @@ pub async fn create()  -> Result<sqlx::Pool<sqlx::Postgres>,sqlx::Error> {
     
     //------
     let schema = get_env("SCHEMA");         
-    println!( "schema : {}",&schema );
-    println!( "url : {}",&db_url );
+    let mut url = Url::parse(&db_url).unwrap();
+    url.set_username("****").unwrap();
+    url.set_password(Some("****")).unwrap();
+    log::info!("> Connect database");
+    log::info!("url : {}", url);
+    log::info!( "schema : {}",&schema );
     let pool: sqlx::Pool<sqlx::Postgres> = PgPool::connect(&db_url).await?;
     Ok(pool)
 }
