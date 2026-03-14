@@ -129,7 +129,7 @@ impl WsClient {
         match &self.role {
             WsRole::WsApi {  api_key ,.. } => {
                 log::info!("session.logon");
-                let param_siged = self.role.sign_wsapi(json!({ "api_key": &api_key }))?;
+                let param_siged = self.role.sign_wsapi(json!({ "apiKey": &api_key }))?;
                 let _resp: serde_json::Value = self.call_wsapi("session.logon", param_siged).await?;
                 self.authed = true;
                 self.authorized_since = _resp["result"]["authorizedSince"].as_i64();
