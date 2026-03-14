@@ -1,7 +1,7 @@
 mod conn;
 mod role;
 mod event;
-
+use crate::utils::{create_payload_signature};
 use chrono::Utc;
 use conn::WsConn;
 use event::WsEvent;
@@ -114,7 +114,6 @@ impl WsClient {
     pub async fn call_wsapi(&mut self, method: &str, params: serde_json::Value) -> anyhow::Result<serde_json::Value> {
         let id = Uuid::new_v4().to_string();
         let rx = self.events.register(id.clone());
-        
         let req = json!({ "id": id, "method": method, "params": params });
         log::debug!("call_wsapi {:?}",&req);
         self.conn.send_text(req.to_string()).await?;
@@ -126,10 +125,12 @@ impl WsClient {
     }
 
     pub async fn logon(&mut self) -> anyhow::Result<serde_json::Value> {
-
+        
         match &self.role {
             WsRole::WsApi {  api_key ,.. } => {
-                let _resp = self.call_wsapi("session.logon", json!({ "api_key": &api_key })).await?;
+                log::info!("session.logon");
+                let param_siged = self.role.sign_wsapi(json!({ "api_key": &api_key }))?;
+                let _resp: serde_json::Value = self.call_wsapi("session.logon", param_siged).await?;
                 self.authed = true;
                 self.authorized_since = _resp["result"]["authorizedSince"].as_i64();
 

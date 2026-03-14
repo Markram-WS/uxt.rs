@@ -26,6 +26,40 @@ pub fn create_signature( payload: &Vec<(&str, String)>,private_key:&str) ->  Res
     Ok(signature_encoded)
 }
 
+
+use serde_json::Value;
+
+pub fn create_payload_signature(
+    payload: &Value, 
+    private_key: &str
+) -> Result<String, Box<dyn std::error::Error>> {
+    // 1. แปลง JSON Value เป็น Query String (เช่น "symbol=BTC&amount=1")
+    // Note: payload ต้องเป็น JSON Object เท่านั้น
+    let query_string = if payload.is_object() {
+        serde_urlencoded::to_string(payload)
+            .map_err(|e| format!("URL params encode failed: {}", e))?
+    } else {
+        return Err("Payload must be a JSON Object".into());
+    };
+
+    // 2. Decode Private Key จาก Base64 (ถ้า private_key ของคุณเป็น Base64)
+    let key_bytes = general_purpose::STANDARD.decode(private_key)?;
+
+    // 3. สร้าง SigningKey (ในที่นี้ใช้ Ed25519 ตามโค้ดที่คุณให้มา)
+    // Note: ตรวจสอบว่า Key เป็น PKCS8 หรือ Raw bytes
+    let signing_key = SigningKey::from_pkcs8_der(&key_bytes)
+        .map_err(|e| format!("Failed to parse pkcs8 ed25519 key: {}", e))?;
+
+    // 4. ทำการ Sign ข้อมูล
+    let signature = signing_key.sign(query_string.as_bytes());
+
+    // 5. แปลง Signature เป็น Base64 และทำ URL Encode
+    let signature_b64 = general_purpose::STANDARD.encode(signature.to_bytes());
+    let signature_encoded = encode(&signature_b64).into_owned();
+
+    Ok(signature_encoded)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
