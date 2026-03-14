@@ -2,7 +2,7 @@ use chrono::Utc;
 use serde_json::Value;
 use crate::utils::sign_ed25519;
 use std::fmt::Debug;
-
+use std::collections::BTreeMap;
 #[derive(Debug)]
 pub enum WsRole {
     Public,
@@ -36,12 +36,14 @@ impl WsRole {
     pub fn sign_wsapi(&self, mut params: Value) -> anyhow::Result<Value> {
         match self {
             WsRole::WsApi { secret, .. } => {
-                params["apiKey"] = self.api_key().unwrap().into();
-
                 let ts = Utc::now().timestamp_millis();
+                let api_key = self.api_key()?;
+                
+                params["apiKey"] = api_key.into();
                 params["timestamp"] = ts.into();
-
-                let query = format!("timestamp={}", ts);
+                let params_map: BTreeMap<String, Value> = serde_json::from_value(params.clone())?;
+                let query = serde_urlencoded::to_string(&params_map)
+                    .map_err(|e| anyhow::anyhow!("Query encoding failed: {}", e))?;
                 let sig = sign_ed25519(secret, &query);
                 params["signature"] = sig.into();
 
