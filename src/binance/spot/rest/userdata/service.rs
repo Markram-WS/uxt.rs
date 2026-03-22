@@ -17,22 +17,40 @@ impl UserDataRestService {
                 None
             )
             .await?;
+
+        let status = res.status();
         let bytes = res.bytes().await?;
-        let body: ListenKeyResponse = serde_json::from_slice(&bytes)?;
+        // ---- Debug
+        if !status.is_success() {
+            let error_msg = String::from_utf8_lossy(&bytes);
+            return Err(anyhow::anyhow!("Binance userDataStream Error ({}): {}", status, error_msg));
+        }
+
+        let body: ListenKeyResponse = serde_json::from_slice(&bytes)
+            .map_err(|e| anyhow::anyhow!("JSON Parse Error: {} | Content: {}", e, String::from_utf8_lossy(&bytes)))?;
+        
         Ok(body.listen_key)
     }
-
     /// PUT /api/v3/userDataStream
     pub async fn keepalive(
         client: &RestClient,
         listen_key: &str,
     ) -> anyhow::Result<()> {
-        client
+        let res = client
             .put(
                 &format!("/api/v3/userDataStream?listenKey={}", listen_key),
                 None::<&()>,
             )
             .await?;
+        // ---- Debug
+        let status = res.status();
+        let bytes = res.bytes().await?;
+        if !status.is_success() {
+            let error_msg = String::from_utf8_lossy(&bytes);
+            return Err(anyhow::anyhow!("Binance keepalive Error ({}): {}", status, error_msg));
+        }
+
+
         Ok(())
     }
 
@@ -41,12 +59,19 @@ impl UserDataRestService {
         client: &RestClient,
         listen_key: &str,
     ) -> anyhow::Result<()> {
-        client
+        let res = client
             .delete(
                 &format!("/api/v3/userDataStream?listenKey={}", listen_key),
                 None::<&()>,
             )
             .await?;
+        // ---- Debug
+        let status = res.status();
+        let bytes = res.bytes().await?;
+        if !status.is_success() {
+            let error_msg = String::from_utf8_lossy(&bytes);
+            return Err(anyhow::anyhow!("Binance keepalive Error ({}): {}", status, error_msg));
+        }
         Ok(())
     }
 
