@@ -73,7 +73,13 @@ impl WsBuilder {
 
     pub fn ticker(mut self, symbol: &str) -> Self {
         self.mode = StreamMode::Public;
-        self.streams.push(format!("{}@bookTicker", symbol.to_lowercase()));
+        self.streams.push(format!("{}@ticker", symbol.to_lowercase()));
+        self
+    }
+
+    pub fn depth(mut self, symbol: &str, levels: u32, speed: &str) -> Self {
+        self.mode = StreamMode::Public;
+        self.streams.push(format!("{}@depth{}@{}", symbol.to_lowercase(), levels, speed));
         self
     }
 
