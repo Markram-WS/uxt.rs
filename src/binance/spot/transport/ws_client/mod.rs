@@ -211,15 +211,12 @@ impl WsClient {
     }
 
     /// SUBSCRIBE public stream via WS-API connection
-    pub async fn subscribe_streams(&mut self, streams: Vec<String>) -> anyhow::Result<()> {
-        let id = Uuid::new_v4().to_string();
-        let req = json!({
-            "method": "SUBSCRIBE",
-            "params": streams,
-            "id": id
+    pub async fn subscribe_streams(&mut self, streams: Vec<String>) -> anyhow::Result<serde_json::Value> {
+        let params = json!({
+            "streams": streams
         });
-        log::debug!("subscribe_streams: {}", req);
-        self.send(&req).await
+        log::debug!("subscribe_streams: {}", params);
+        self.call_wsapi("subscribe", params).await
     }
 
     pub async fn time(&mut self) -> anyhow::Result<Option<i64>> {
