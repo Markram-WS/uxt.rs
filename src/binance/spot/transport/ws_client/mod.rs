@@ -78,8 +78,13 @@ impl WsClient {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(text) {
                         // 1. ลองส่งให้ oneshot (API) ก่อน
                         if !events_clone.dispatch(json.clone()) {
-                            // 2. ถ้าไม่ใช่ API Response ให้โยนลงถังพักสตรีม
-                            let _ = stream_tx.send(json);
+                            // 2. ถ้าไม่ใช่ API Response และเป็นข้อมูลที่มีโครงสร้าง (Object/Array) ให้ส่งลง Stream
+                            if json.is_object() || json.is_array() {
+                                let _ = stream_tx.send(json);
+                            } else {
+                                // ข้ามข้อมูลประเภท Number (Heartbeat) หรืออื่นๆ ที่ไม่ใช่ Data
+                                log::trace!("Filtered non-data message: {:?}", json);
+                            }
                         }
                     }
                 }
