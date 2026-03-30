@@ -5,11 +5,12 @@ use crate::utils::{create_payload_signature};
 use chrono::Utc;
 use conn::WsConn;
 use event::WsEvent;
-use futures::StreamExt;
+use futures::{StreamExt, SinkExt};
 use role::WsRole;
 use serde_json::json;
 use tokio::sync::mpsc::{self};
 use tokio_tungstenite::connect_async;
+use tokio_tungstenite::tungstenite::Message;
 use serde::Serialize;
 use crate::binance::spot::{WsBuilder,StreamMode};
 use uuid::Uuid;
@@ -22,7 +23,7 @@ use anyhow;
 pub struct WsClient {
     conn: WsConn,
     events: WsEvent,
-    stream_rx: mpsc::UnboundedReceiver<serde_json::Value>, // ถังพักสำหรับ read_once
+    stream_rx: mpsc::UnboundedReceiver<serde_json::Value>, 
     pub role: WsRole,
     pub authed:bool,
     pub authorized_since:Option<i64>,
@@ -32,67 +33,88 @@ pub struct WsClient {
 
 impl WsClient {
     pub async fn connect(builder: WsBuilder) -> anyhow::Result<Self> {
-        log::debug!("> connect_async {}",&builder.base_url);
+        log::info!("> Connecting to WebSocket: {}",&builder.base_url);
         let (ws, _) = connect_async(&builder.base_url).await?;
-        let (writer, mut reader) = ws.split(); // แยก ร่าง!
+        let (mut writer, mut reader) = ws.split();
 
         let (stream_tx, stream_rx) = mpsc::unbounded_channel();
+        let (write_tx, mut write_rx) = mpsc::unbounded_channel::<Message>();
+        
         let events = WsEvent::new();
         let events_clone = events.clone();
+        let write_tx_clone = write_tx.clone();
 
-        //---authed--
+        // --- Background Reader Loop ---
+        tokio::spawn(async move {
+            log::debug!("WS Reader Loop started");
+            while let Some(msg_res) = reader.next().await {
+                match msg_res {
+                    Ok(Message::Text(text)) => {
+                        log::debug!("WS RECEIVED: {}", text); // DEBUG LOG
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
+                            // 1. Dispatch to API Response (oneshot)
+                            if !events_clone.dispatch(json.clone()) {
+                                // 2. Send to Stream if Data
+                                if json.is_object() || json.is_array() {
+                                    let _ = stream_tx.send(json);
+                                }
+                            }
+                        }
+                    }
+                    Ok(Message::Ping(payload)) => {
+                        log::debug!("WS RECEIVED: PING");
+                        let _ = write_tx_clone.send(Message::Pong(payload));
+                    }
+                    Ok(Message::Pong(_)) => {
+                        log::debug!("WS RECEIVED: PONG");
+                    }
+                    Ok(Message::Close(cf)) => {
+                        log::warn!("WS RECEIVED: CLOSE {:?}", cf);
+                        break;
+                    }
+                    Err(e) => {
+                        log::error!("WS Reader Error: {}", e);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+            log::warn!("WS Reader Loop exited");
+        });
+
+        // --- Background Writer Loop ---
+        tokio::spawn(async move {
+            log::debug!("WS Writer Loop started");
+            while let Some(msg) = write_rx.recv().await {
+                if let Err(e) = writer.send(msg).await {
+                    log::error!("WS Writer Error: {}", e);
+                    break;
+                }
+            }
+            log::warn!("WS Writer Loop exited");
+        });
+
+        // --- Role & Auth Logic ---
         let mut authed = false;
         let mut authorized_since = None;
-        //---role--
         let role: WsRole = match builder.mode {
             StreamMode::Public => {
                 authed = true;
                 authorized_since = Some(Utc::now().timestamp_millis());
-                log::debug!("> Create : WsRole::Public");
                 WsRole::Public
             },
             StreamMode::UserData => {
                 authed = true;
                 authorized_since = Some(Utc::now().timestamp_millis());
-                log::debug!("> Create : WsRole::UserData");
-                WsRole::UserData {
-                    api_key: builder.api_key,
-                    secret: builder.secret
-                }
-                
+                WsRole::UserData { api_key: builder.api_key, secret: builder.secret }
             },
             StreamMode::WsApi => {
-            log::debug!("> Create : WsRole::UserData");
-            WsRole::WsApi {
-                api_key: builder.api_key,
-                secret: builder.secret
-            }
+                WsRole::WsApi { api_key: builder.api_key, secret: builder.secret }
             }
         };
-        
-
-        // --- Background Loop: ตัวแยกประเภทข้อมูล ---
-        tokio::spawn(async move {
-            while let Some(Ok(msg)) = reader.next().await {
-                if let Ok(text) = msg.to_text() {
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(text) {
-                        // 1. ลองส่งให้ oneshot (API) ก่อน
-                        if !events_clone.dispatch(json.clone()) {
-                            // 2. ถ้าไม่ใช่ API Response และเป็นข้อมูลที่มีโครงสร้าง (Object/Array) ให้ส่งลง Stream
-                            if json.is_object() || json.is_array() {
-                                let _ = stream_tx.send(json);
-                            } else {
-                                // ข้ามข้อมูลประเภท Number (Heartbeat) หรืออื่นๆ ที่ไม่ใช่ Data
-                                log::trace!("Filtered non-data message: {:?}", json);
-                            }
-                        }
-                    }
-                }
-            }
-        });
 
         Ok(Self {
-            conn: WsConn::new(writer),
+            conn: WsConn::new(write_tx),
             events,
             stream_rx,
             role,
@@ -110,142 +132,83 @@ impl WsClient {
         self.conn.close().await?;
         Ok(())
     }
-    // -------- transport ----------
+
     pub async fn read_once(&mut self) -> Option<serde_json::Value> {
         self.stream_rx.recv().await
     }
 
-    // -------- generic send ----------
     pub async fn send<T: Serialize>(&mut self, data: &T) -> anyhow::Result<()> {
         let txt = serde_json::to_string(data)?;
         self.conn.send_text(txt).await
     }
     
-    // -------- WS-API ----------
-    // API: ส่งแล้วรอ Response ด้วย ID
     pub async fn call_wsapi(&mut self, method: &str, params: serde_json::Value) -> anyhow::Result<serde_json::Value> {
         let id = Uuid::new_v4().to_string();
         let rx = self.events.register(id.clone());
         let req = json!({ "id": id, "method": method, "params": params });
-        log::debug!("call_wsapi {:?}",&req);
+        log::debug!("WS SEND (API): {}", req);
         self.conn.send_text(req.to_string()).await?;
 
-        let resp = timeout(Duration::from_secs(self.timeout_sec.try_into()?), rx).await??;
-        Ok(resp)
+        match timeout(Duration::from_secs(self.timeout_sec.try_into()?), rx).await {
+            Ok(Ok(resp)) => {
+                log::debug!("WS RECV (API RESPONSE): id: {} method: {}", id, method);
+                Ok(resp)
+            }
+            Ok(Err(_)) => anyhow::bail!("Channel error for method {}", method),
+            Err(_) => anyhow::bail!("Timeout waiting for {} (id: {})", method, id),
+        }
     }
 
     pub async fn logon(&mut self) -> anyhow::Result<serde_json::Value> {
-        
         match &self.role {
-            WsRole::WsApi {  api_key ,.. } => {
-                log::info!("session.logon");
+            WsRole::WsApi { api_key ,.. } => {
                 let param_siged = self.role.sign_wsapi(json!({ "apiKey": &api_key }))?;
-                let _resp: serde_json::Value = self.call_wsapi("session.logon", param_siged).await?;
-                if let Some(result) = _resp.get("result") {
+                let resp = self.call_wsapi("session.logon", param_siged).await?;
+                if let Some(result) = resp.get("result") {
                     self.authed = true;
                     Ok(json!(result))
                 } else {
-                    Err(anyhow::anyhow!("No 'result' field in response: {:?}", _resp))
+                    anyhow::bail!("Logon failed: {:?}", resp)
                 }
             }      
-            _ => {
-                anyhow::bail!("\nlogout called but WsRole is not WsApi");
-            }
+            _ => anyhow::bail!("Logon only supported for WsApi role"),
         }
     }
 
     pub async fn logout(&mut self) -> anyhow::Result<()> {
-
-        match &mut self.role {
-            WsRole::WsApi {  .. } => {
-                let _resp = self.call_wsapi("session.logout", json!({})).await?;
-                self.authed = false;
-                Ok(())
-            }      
-            _ => {
-                anyhow::bail!("\nlogout called but WsRole is not WsApi");
-            }
+        if let WsRole::WsApi { .. } = &self.role {
+            self.call_wsapi("session.logout", json!({})).await?;
+            self.authed = false;
+            Ok(())
+        } else {
+            anyhow::bail!("Logout only supported for WsApi role")
         }
     }
 
     pub async fn status(&mut self) -> anyhow::Result<serde_json::Value> {
-        match &mut self.role {
-            WsRole::WsApi {  .. } => {
-                let resp = self
-                    .call_wsapi("session.status", json!({ }))
-                    .await?;
-                if resp["result"]["apiKey"].is_null() {
-                    let mut json_res = resp["rateLimits"].clone();
-                    json_res["authorizedSince"] =  resp["result"]["authorizedSince"].clone();
-                    json_res["apiKey"]= resp["result"]["apiKey"].clone();
-                    Ok(json!(json_res))
-                } else {
-                    anyhow::bail!("\nstatus failed apiKey null : {:?} ", resp);
-                }
-            }
-            _ => {
-                anyhow::bail!("\nstatus called but WsRole is not WsApi");
-            }
+        if let WsRole::WsApi { .. } = &self.role {
+            self.call_wsapi("session.status", json!({})).await
+        } else {
+            anyhow::bail!("Status only supported for WsApi role")
         }
     }
 
     pub async fn ping(&mut self) -> anyhow::Result<serde_json::Value> {
-        match &mut self.role {
-            WsRole::WsApi {..} => {
-                match self.authed {
-                    true => {
-                        let resp = self
-                        .call_wsapi("ping", json!({  }))
-                        .await?;
-        
-                        let rate_limit = &resp["rateLimits"] ;
-                        Ok(json!(rate_limit))
-                    }
-                    _ => {
-                        anyhow::bail!("\nping called but authed must be logon");
-                    }
-                }
-
-            }
-            _ => {
-                anyhow::bail!("\nping called but WsRole is not WsApi");
-            }
+        if self.authed {
+            self.call_wsapi("ping", json!({})).await
+        } else {
+            anyhow::bail!("Ping requires logon first")
         }
     }
 
-    /// SUBSCRIBE public stream via WS-API connection
     pub async fn subscribe_streams(&mut self, streams: Vec<String>) -> anyhow::Result<serde_json::Value> {
-        let params = json!({
-            "streams": streams
-        });
-        log::debug!("subscribe_streams: {}", params);
+        let params = json!({ "streams": streams });
+        log::info!("WS Subscribing to: {:?}", streams);
         self.call_wsapi("subscribe", params).await
     }
 
     pub async fn time(&mut self) -> anyhow::Result<Option<i64>> {
-        match &self.role {
-            WsRole::WsApi {  .. } => {
-                match self.authed {
-                    true => {
-                        let resp = self
-                        .call_wsapi("time", json!({}))
-                        .await?;
-        
-                      
-                        let server_time = resp["result"]["serverTime"].as_i64();
-                        Ok(server_time)
-                    
-                    }
-                    _ => {
-                        anyhow::bail!("\nping called but authed must be logon");
-                    }
-                }
-
-            }
-            _ => {
-                anyhow::bail!("\nping called but WsRole is not WsApi");
-            }
-        }
+        let resp = self.call_wsapi("time", json!({})).await?;
+        Ok(resp["result"]["serverTime"].as_i64())
     }
-
 }
