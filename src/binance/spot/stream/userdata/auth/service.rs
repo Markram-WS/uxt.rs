@@ -1,35 +1,25 @@
-use uuid::Uuid;
-use chrono::Utc;
-
-use crate::utils::sign;
-use super::model::{UserDataSubscribeRequest, UserDataSubscribeParams};
+use serde_json::json;
 use crate::binance::spot::WsClient;
 
 pub struct UserDataAuthService;
 
 impl UserDataAuthService {
     pub async fn subscribe(client: &mut WsClient) -> anyhow::Result<()> {
-        // timestamp
-        let ts = Utc::now().timestamp_millis();
-
-        // query = "timestamp=<ts>"
-        let query = format!("timestamp={}", ts);
-        let signature = sign(&client.role.secret()?, &query);
-
-        let req = UserDataSubscribeRequest {
-            id: Uuid::new_v4().to_string(),
-            method: "userDataStream.subscribe.signature".into(),
-            params: UserDataSubscribeParams {
-                api_key: client.role.api_key()?.to_string(),
-                timestamp: ts,
-                signature,
-            },
-        };
-
-        client.send(&req).await?;
-        Ok(())
+        match client.call_wsapi("userDataStream.subscribe",json!({}) ).await  {
+            Ok(_) => {
+                log::info!("> subscribe userDataStream");
+                Ok(())
+            }
+            Err(e) => {
+                log::error!("Err userDataStream.subscribe : {}",e);
+                Err(e)
+            }
+        }
     }
 }
+
+
+
 
 
 // Example UserDataEventHandler

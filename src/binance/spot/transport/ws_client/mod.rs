@@ -32,6 +32,7 @@ pub struct WsClient {
 
 impl WsClient {
     pub async fn connect(builder: WsBuilder) -> anyhow::Result<Self> {
+        log::debug!("> connect_async {}",&builder.base_url);
         let (ws, _) = connect_async(&builder.base_url).await?;
         let (writer, mut reader) = ws.split(); // แยก ร่าง!
 
@@ -47,19 +48,25 @@ impl WsClient {
             StreamMode::Public => {
                 authed = true;
                 authorized_since = Some(Utc::now().timestamp_millis());
+                log::debug!("> Create : WsRole::Public");
                 WsRole::Public
             },
             StreamMode::UserData => {
                 authed = true;
                 authorized_since = Some(Utc::now().timestamp_millis());
+                log::debug!("> Create : WsRole::UserData");
                 WsRole::UserData {
                     api_key: builder.api_key,
                     secret: builder.secret
                 }
+                
             },
-            StreamMode::WsApi => WsRole::WsApi {
+            StreamMode::WsApi => {
+            log::debug!("> Create : WsRole::UserData");
+            WsRole::WsApi {
                 api_key: builder.api_key,
                 secret: builder.secret
+            }
             }
         };
         
