@@ -34,17 +34,17 @@ async fn test_binance_spot_user_stream_depth_service() {
 
     let sample = r#"{
 
-        "lastUpdateId": 160,     // Last update ID
-        "bids": [                // Bids to be updated
+        "lastUpdateId": 160, 
+        "bids": [              
             [
-                "0.0024",        // Price level to be updated
-                "10"             // Quantity
+                "0.0024", 
+                "10"       
             ]
         ],
-        "asks": [                // Asks to be updated
+        "asks": [              
             [
-                "0.0026",        // Price level to be updated
-                "100"            // Quantity
+                "0.0026",     
+                "100"
             ]
         ]
 
