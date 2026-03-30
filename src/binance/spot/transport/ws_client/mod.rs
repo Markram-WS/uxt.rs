@@ -15,6 +15,8 @@ use serde::Serialize;
 use crate::binance::spot::{WsBuilder,StreamMode};
 use uuid::Uuid;
 use std::{time::Duration};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use tokio::time::timeout;
 use anyhow;
@@ -28,6 +30,7 @@ pub struct WsClient {
     pub authed:bool,
     pub authorized_since:Option<i64>,
     pub timeout_sec: i64,
+    debug_log: Arc<AtomicBool>, // เพิ่มตัวแปรควบคุม Log
 
 }
 
@@ -43,6 +46,10 @@ impl WsClient {
         let events = WsEvent::new();
         let events_clone = events.clone();
         let write_tx_clone = write_tx.clone();
+        
+        // สถานะการเปิด/ปิด Log
+        let debug_log = Arc::new(AtomicBool::new(builder.debug_log));
+        let debug_log_clone = debug_log.clone();
 
         // --- Background Reader Loop ---
         tokio::spawn(async move {
@@ -50,11 +57,13 @@ impl WsClient {
             while let Some(msg_res) = reader.next().await {
                 match msg_res {
                     Ok(Message::Text(text)) => {
-                        log::debug!("WS RECEIVED: {}", text); // DEBUG LOG
+                        // ตรวจสอบ toggle ก่อน Log
+                        if debug_log_clone.load(Ordering::Relaxed) {
+                            log::debug!("WS RECEIVED: {}", text);
+                        }
+                        
                         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-                            // 1. Dispatch to API Response (oneshot)
                             if !events_clone.dispatch(json.clone()) {
-                                // 2. Send to Stream if Data
                                 if json.is_object() || json.is_array() {
                                     let _ = stream_tx.send(json);
                                 }
@@ -62,11 +71,11 @@ impl WsClient {
                         }
                     }
                     Ok(Message::Ping(payload)) => {
-                        log::debug!("WS RECEIVED: PING");
+                        if debug_log_clone.load(Ordering::Relaxed) { log::debug!("WS RECEIVED: PING"); }
                         let _ = write_tx_clone.send(Message::Pong(payload));
                     }
                     Ok(Message::Pong(_)) => {
-                        log::debug!("WS RECEIVED: PONG");
+                        if debug_log_clone.load(Ordering::Relaxed) { log::debug!("WS RECEIVED: PONG"); }
                     }
                     Ok(Message::Close(cf)) => {
                         log::warn!("WS RECEIVED: CLOSE {:?}", cf);
@@ -121,7 +130,14 @@ impl WsClient {
             authed,
             authorized_since,
             timeout_sec: 10,
+            debug_log,
         })
+    }
+
+    // --- เมธอดใหม่สำหรับ Toggle Log ---
+    pub fn set_debug_log(&self, enable: bool) {
+        self.debug_log.store(enable, Ordering::Relaxed);
+        log::info!("WS Debug Log set to: {}", enable);
     }
 
     pub async fn set_timeout(mut self, timeout_sec:i64) {
@@ -146,12 +162,18 @@ impl WsClient {
         let id = Uuid::new_v4().to_string();
         let rx = self.events.register(id.clone());
         let req = json!({ "id": id, "method": method, "params": params });
-        log::debug!("WS SEND (API): {}", req);
+        
+        if self.debug_log.load(Ordering::Relaxed) {
+            log::debug!("WS SEND (API): {}", req);
+        }
+
         self.conn.send_text(req.to_string()).await?;
 
         match timeout(Duration::from_secs(self.timeout_sec.try_into()?), rx).await {
             Ok(Ok(resp)) => {
-                log::debug!("WS RECV (API RESPONSE): id: {} method: {}", id, method);
+                if self.debug_log.load(Ordering::Relaxed) {
+                    log::debug!("WS RECV (API RESPONSE): id: {} method: {}", id, method);
+                }
                 Ok(resp)
             }
             Ok(Err(_)) => anyhow::bail!("Channel error for method {}", method),

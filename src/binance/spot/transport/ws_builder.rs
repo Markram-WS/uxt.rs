@@ -21,6 +21,7 @@ pub struct WsBuilder {
     listen_key: Option<String>,
     pub api_key: String,
     pub secret: String,
+    pub debug_log: bool,
 
     // final URL ที่จะใช้เชื่อมต่อ
     pub base_url: String,
@@ -35,8 +36,14 @@ impl WsBuilder {
             listen_key: None,
             api_key: api_key.to_string(),
             secret: secret.to_string(),
+            debug_log: false, // default เป็นปิดไว้ก่อน
             base_url: "".into(),
         }
+    }
+
+    pub fn debug_log(mut self, enable: bool) -> Self {
+        self.debug_log = enable;
+        self
     }
 
     pub fn spot(api_key: &str, secret: &str) -> Self {
