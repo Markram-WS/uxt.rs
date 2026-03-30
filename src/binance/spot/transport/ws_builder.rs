@@ -97,15 +97,15 @@ impl WsBuilder {
         match self.mode {
             StreamMode::Public => {
                 self.base_url = self.build_public_url();
-                log::debug!("build url : {}",self.base_url);
+                log::debug!("build public url : {}",self.base_url);
             }
             StreamMode::UserData => {
                 self.base_url = self.build_userdata_url();
-                log::debug!("build url : {}",self.base_url);
+                log::debug!("build userdata url : {}",self.base_url);
             }
             StreamMode::WsApi => {
                 self.base_url = self.build_wsapi_url();
-                log::debug!("build url : {}",self.base_url);
+                log::debug!("build wsapi url : {}",self.base_url);
             }
 
         }
