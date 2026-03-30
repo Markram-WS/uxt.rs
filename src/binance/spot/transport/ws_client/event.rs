@@ -30,13 +30,10 @@ impl WsEvent {
         });
 
         if let Some(id_str) = id {
-            // Check if it looks like an API response (has status or result field)
-            if msg.get("status").is_some() || msg.get("result").is_some() || msg.get("error").is_some() {
-                let mut pending = self.pending.lock().unwrap();
-                if let Some(tx) = pending.remove(&id_str) {
-                    let _ = tx.send(msg);
-                    return true; // Handled as API Response
-                }
+            let mut pending = self.pending.lock().unwrap();
+            if let Some(tx) = pending.remove(&id_str) {
+                let _ = tx.send(msg);
+                return true; // Handled as API Response
             }
         }
         false // Not an API response, handle as Stream Data

@@ -125,10 +125,8 @@ impl WsClient {
         log::debug!("call_wsapi {:?}",&req);
         self.conn.send_text(req.to_string()).await?;
 
-        timeout(Duration::from_secs(self.timeout_sec.try_into()?), rx).await??
-            .as_object()
-            .ok_or_else(|| anyhow::anyhow!("Invalid response"))
-            .map(|obj| serde_json::Value::Object(obj.clone()))
+        let resp = timeout(Duration::from_secs(self.timeout_sec.try_into()?), rx).await??;
+        Ok(resp)
     }
 
     pub async fn logon(&mut self) -> anyhow::Result<serde_json::Value> {

@@ -4,7 +4,8 @@ use crate::binance::spot::WsClient;
 pub struct UserDataAuthService;
 impl UserDataAuthService {
     pub async fn subscribe(client: &mut WsClient, api_key: &str) -> anyhow::Result<()> {
-        match client.call_wsapi("userDataStream.subscribe", json!({ "apiKey": api_key })).await  {
+        let params = client.role.sign_wsapi(json!({ "apiKey": api_key }))?;
+        match client.call_wsapi("userDataStream.subscribe", params).await  {
             Ok(_) => {
                 log::info!("> subscribe userDataStream success");
                 Ok(())

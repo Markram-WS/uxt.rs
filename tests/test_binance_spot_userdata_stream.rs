@@ -53,7 +53,7 @@ mod tests {
             .build();
         
         let mut ws_client = WsClient::connect(userdata_builder).await.unwrap();
-        let _ =UserDataAuthService::subscribe(&mut ws_client).await.unwrap();
+        let _ =UserDataAuthService::subscribe(&mut ws_client, &binance_api).await.unwrap();
     
 
         let (orderservice, mut rx_order) = OrderService ::new();
