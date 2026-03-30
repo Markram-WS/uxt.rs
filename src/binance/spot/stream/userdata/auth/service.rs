@@ -2,12 +2,11 @@ use serde_json::json;
 use crate::binance::spot::WsClient;
 
 pub struct UserDataAuthService;
-
 impl UserDataAuthService {
-    pub async fn subscribe(client: &mut WsClient) -> anyhow::Result<()> {
-        match client.call_wsapi("userDataStream.subscribe",json!({}) ).await  {
+    pub async fn subscribe(client: &mut WsClient, api_key: &str) -> anyhow::Result<()> {
+        match client.call_wsapi("userDataStream.subscribe", json!({ "apiKey": api_key })).await  {
             Ok(_) => {
-                log::info!("> subscribe userDataStream");
+                log::info!("> subscribe userDataStream success");
                 Ok(())
             }
             Err(e) => {
@@ -17,6 +16,7 @@ impl UserDataAuthService {
         }
     }
 }
+
 
 
 

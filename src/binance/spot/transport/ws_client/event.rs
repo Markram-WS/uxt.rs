@@ -18,17 +18,27 @@ impl WsEvent {
         rx
     }
     pub fn dispatch(&self, msg: serde_json::Value) -> bool {
-        if let ( Some(_id),Some(_status),Some(_result)  )  = 
-        (msg.get("id").and_then(|v| v.as_str()) 
-        , msg.get("status")
-        , msg.get("result")
-        ){
-        
-                if let Some(tx) = self.pending.lock().unwrap().remove(_id) {
+        // Extract ID as String whether it is a String or Number in JSON
+        let id = msg.get("id").and_then(|v| {
+            if v.is_string() {
+                v.as_str().map(|s| s.to_string())
+            } else if v.is_number() {
+                Some(v.to_string())
+            } else {
+                None
+            }
+        });
+
+        if let Some(id_str) = id {
+            // Check if it looks like an API response (has status or result field)
+            if msg.get("status").is_some() || msg.get("result").is_some() || msg.get("error").is_some() {
+                let mut pending = self.pending.lock().unwrap();
+                if let Some(tx) = pending.remove(&id_str) {
                     let _ = tx.send(msg);
-                    return true; // จัดการแล้ว (เป็น API Response)
+                    return true; // Handled as API Response
                 }
+            }
         }
-        false // ยังไม่ได้จัดการ (อาจเป็น Stream Data)
+        false // Not an API response, handle as Stream Data
     }
 }
