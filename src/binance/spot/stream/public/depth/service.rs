@@ -17,14 +17,20 @@ impl DepthService {
     }
 
     pub async fn handle(&self,parsed:&serde_json::Value) ->anyhow::Result<()> {
-        //let parsed: Value = serde_json::from_str(txt ?;
-        if parsed.get("lastUpdateId").is_some() && parsed.get("bids").is_some()  && parsed.get("asks").is_some() {
-            let ev = serde_json::from_value::<Event>(parsed.clone())?;
+
+        // ตรวจสอบก่อนว่าข้อมูลที่ส่งมาถูกห่ออยู่ในฟิลด์ "data" หรือไม่
+        let data = parsed.get("data").unwrap_or(parsed);
+
+        
+        if data.get("lastUpdateId").is_some() && data.get("bids").is_some() && data.get("asks").is_some() {
+            //แปลงค่าจาก 'data' (ที่เป็นก้อนข้อมูล Depth จริงๆ)
+            let ev = serde_json::from_value::<Event>(data.clone())?;
             self.tx.send(ev).await?;
-            return Ok(());
-        }else{
-            Ok(())
+        return Ok(());
+        } else {
+        Ok(())
         }
+
     }
 }
 
