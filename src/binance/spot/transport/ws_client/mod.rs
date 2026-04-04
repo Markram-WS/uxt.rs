@@ -30,11 +30,16 @@ pub struct WsClient {
     pub authed:bool,
     pub authorized_since:Option<i64>,
     pub timeout_sec: i64,
+    pub recv_window:Option<i64>,
     debug_log: Arc<AtomicBool>, // เพิ่มตัวแปรควบคุม Log
 
 }
 
 impl WsClient {
+    pub fn set_recv_window(&mut self, window: i64) {
+        self.recv_window = Some(window);
+    }
+
     pub async fn connect(builder: WsBuilder) -> anyhow::Result<Self> {
         log::info!("> Connecting to WebSocket: {}",&builder.base_url);
         let (ws, _) = connect_async(&builder.base_url).await?;
@@ -130,7 +135,9 @@ impl WsClient {
             authed,
             authorized_since,
             timeout_sec: 10,
+            recv_window: None,
             debug_log,
+
         })
     }
 
@@ -184,7 +191,11 @@ impl WsClient {
     pub async fn logon(&mut self) -> anyhow::Result<serde_json::Value> {
         match &self.role {
             WsRole::WsApi { api_key ,.. } => {
-                let param_siged = self.role.sign_wsapi(json!({ "apiKey": &api_key }))?;
+                let mut param = json!({ "apiKey": &api_key });
+                if let Some(recv_window) = self.recv_window {
+                    param["recvWindow"] = recv_window.into();
+                }
+                let param_siged = self.role.sign_wsapi(param)?;
                 let resp = self.call_wsapi("session.logon", param_siged).await?;
                 if let Some(result) = resp.get("result") {
                     self.authed = true;
