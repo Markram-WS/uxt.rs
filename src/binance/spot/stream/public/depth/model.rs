@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 #[allow(dead_code)]
 #[derive(Serialize)]
 #[derive(Debug, Deserialize)]
-
+#[serde(from = "(String, String)")] 
 pub struct PriceStep {
     pub price: f64,
     pub quantity: f64,
